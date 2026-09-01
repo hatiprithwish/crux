@@ -1,16 +1,16 @@
 {
   "$schema": "https://ui.shadcn.com/schema.json",
-  "style": "radix-mira",
+  "style": "radix-luma",
   "rsc": false,
   "tsx": true,
   "tailwind": {
     "config": "",
     "css": "src/styles.css",
-    "baseColor": "neutral",
+    "baseColor": "mist",
     "cssVariables": true,
     "prefix": ""
   },
-  "iconLibrary": "phosphor",
+  "iconLibrary": "remixicon",
   "rtl": false,
   "aliases": {
     "components": "@/shadcn",
@@ -19,7 +19,7 @@
     "lib": "@/utils",
     "hooks": "@/hooks"
   },
-  "menuColor": "default",
+  "menuColor": "inverted",
   "menuAccent": "bold",
   "registries": {}
 }

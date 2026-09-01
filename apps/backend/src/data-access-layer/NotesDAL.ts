@@ -5,6 +5,7 @@ import getDbClient from "@/db/dbClient";
 import { notes } from "@/db/tables";
 import * as Schemas from "@app/schemas";
 import AppLogger from "@/providers/logger";
+import Utility from "@/utils/Utility";
 
 export default class NotesDAL {
   private db: DrizzleD1Database;
@@ -21,6 +22,7 @@ export default class NotesDAL {
       const noteResponse = await this.db
         .insert(notes)
         .values({
+          publicId: Utility.generatePublicId(),
           userId: params.userId,
           title: params.title,
           body: params.body,
@@ -52,7 +54,10 @@ export default class NotesDAL {
     const response: Schemas.GetNoteApiResponse = { isSuccess: false };
 
     try {
-      const conditions: SQL[] = [eq(notes.id, params.id), eq(notes.userId, params.userId)];
+      const conditions: SQL[] = [
+        eq(notes.publicId, params.publicId),
+        eq(notes.userId, params.userId),
+      ];
 
       const [note] = await this.db
         .select()
@@ -131,7 +136,7 @@ export default class NotesDAL {
           body: params.body,
           updatedAt: now,
         })
-        .where(and(eq(notes.id, params.id), eq(notes.userId, params.userId)))
+        .where(and(eq(notes.publicId, params.publicId), eq(notes.userId, params.userId)))
         .returning()
         .get();
 
@@ -171,7 +176,7 @@ export default class NotesDAL {
     try {
       await this.db
         .delete(notes)
-        .where(and(eq(notes.id, params.id), eq(notes.userId, params.userId)));
+        .where(and(eq(notes.publicId, params.publicId), eq(notes.userId, params.userId)));
 
       response.isSuccess = true;
       response.message = "Note deleted successfully";

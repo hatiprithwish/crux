@@ -14,6 +14,7 @@ export interface UserBase {
 }
 
 export interface User extends UserBase {
+  publicId: string;
   createdAt: Date;
   updatedAt?: Date | null;
 }

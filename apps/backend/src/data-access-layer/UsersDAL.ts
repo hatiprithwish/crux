@@ -4,6 +4,7 @@ import getDbClient from "@/db/dbClient";
 import { users } from "@/db/tables";
 import * as Schemas from "@app/schemas";
 import AppLogger from "@/providers/logger";
+import Utility from "@/utils/Utility";
 
 export default class UsersDAL {
   private db: DrizzleD1Database;
@@ -39,6 +40,7 @@ export default class UsersDAL {
       response.isSuccess = true;
       response.message = "User details fetched successfully";
       response.user = {
+        publicId: user.publicId,
         clerkId: user.clerkId,
         email: user.email,
         createdAt: user.createdAt,
@@ -69,6 +71,7 @@ export default class UsersDAL {
       await this.db
         .insert(users)
         .values({
+          publicId: Utility.generatePublicId(),
           clerkId: params.clerkId,
           email: params.email,
           role: params.role,

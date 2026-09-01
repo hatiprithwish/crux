@@ -9,8 +9,9 @@ export default class NotesRepo {
   }
 
   private withStatusLabel(note: Schemas.Note): Schemas.NoteWithStatus {
+    const { id: _id, ...rest } = note;
     return {
-      ...note,
+      ...rest,
       noteStatus: note.status,
       noteStatusLabel: Schemas.NOTE_STATUS_LABEL_MAP[note.status],
     };
@@ -28,7 +29,7 @@ export default class NotesRepo {
     return result;
   }
 
-  async getNoteDetails(params: { userId: string; id: number }) {
+  async getNoteDetails(params: { userId: string; publicId: string }) {
     const result = await this.dal.getNoteDetails(params);
     if (result.isSuccess && result.note) {
       result.note = this.withStatusLabel(result.note);
@@ -44,9 +45,9 @@ export default class NotesRepo {
     return result;
   }
 
-  async updateNote(params: Schemas.UpdateNoteApiRequest & { userId: string; id: number }) {
+  async updateNote(params: Schemas.UpdateNoteApiRequest & { userId: string; publicId: string }) {
     const result = await this.dal.updateNote({
-      id: params.id,
+      publicId: params.publicId,
       userId: params.userId,
       title: params.note.title ?? null,
       body: params.note.body ?? null,
@@ -57,7 +58,7 @@ export default class NotesRepo {
     return result;
   }
 
-  async deleteNote(params: { userId: string; id: number }) {
+  async deleteNote(params: { userId: string; publicId: string }) {
     return await this.dal.deleteNote(params);
   }
 }

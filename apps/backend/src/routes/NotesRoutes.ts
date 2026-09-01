@@ -30,43 +30,48 @@ NotesRoutes.get("/", checkAuth, async (c) => {
   return c.json(response, response.isSuccess ? 200 : 500);
 });
 
-NotesRoutes.get("/:id", checkAuth, zValidator("param", z.object({ id: z.string() })), async (c) => {
-  const userId = c.get("clerkUserId");
-  const { id } = c.req.valid("param");
+NotesRoutes.get(
+  "/:publicId",
+  checkAuth,
+  zValidator("param", z.object({ publicId: z.string() })),
+  async (c) => {
+    const userId = c.get("clerkUserId");
+    const { publicId } = c.req.valid("param");
 
-  const repo = new NotesRepo(c.env);
-  const response = await repo.getNoteDetails({ id: Number(id), userId });
+    const repo = new NotesRepo(c.env);
+    const response = await repo.getNoteDetails({ publicId, userId });
 
-  return c.json(response, response.isSuccess ? 200 : 404);
-});
+    return c.json(response, response.isSuccess ? 200 : 404);
+  },
+);
 
 NotesRoutes.patch(
-  "/:id",
+  "/:publicId",
   checkAuth,
-  zValidator("param", z.object({ id: z.string() })),
+  zValidator("param", z.object({ publicId: z.string() })),
   zValidator("json", Schemas.ZUpdateNoteApiRequest),
   async (c) => {
     const userId = c.get("clerkUserId");
-    const { id } = c.req.valid("param");
+    const { publicId } = c.req.valid("param");
     const body = c.req.valid("json");
 
     const repo = new NotesRepo(c.env);
-    const response = await repo.updateNote({ id: Number(id), userId, ...body });
+    const response = await repo.updateNote({ publicId, userId, ...body });
 
     return c.json(response, response.isSuccess ? 200 : 404);
   },
 );
 
 NotesRoutes.delete(
-  "/:id",
+  "/:publicId",
   checkAuth,
-  zValidator("param", z.object({ id: z.string() })),
+  zValidator("param", z.object({ publicId: z.string() })),
   async (c) => {
     const userId = c.get("clerkUserId");
-    const { id } = c.req.valid("param");
+    const { publicId } = c.req.valid("param");
 
     const repo = new NotesRepo(c.env);
-    const response = await repo.deleteNote({ id: Number(id), userId });
+    const response = await repo.deleteNote({ publicId, userId });
 
     return c.json(response, response.isSuccess ? 200 : 404);
   },

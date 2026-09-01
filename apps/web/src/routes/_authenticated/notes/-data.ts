@@ -8,7 +8,7 @@ export class NotesQueries {
   // DEV_NOTE: Keys form a hierarchy — detail extends all. Invalidating all() also invalidates every detail, so one call clears the entire notes cache.
   static readonly keys = {
     all: () => ["notes"] as const,
-    detail: (id: number) => ["notes", id] as const,
+    detail: (publicId: string) => ["notes", publicId] as const,
   };
 
   static list(getToken: () => Promise<string | null>) {
@@ -19,11 +19,11 @@ export class NotesQueries {
     });
   }
 
-  static detail(id: number, getToken: () => Promise<string | null>) {
+  static detail(publicId: string, getToken: () => Promise<string | null>) {
     return queryOptions({
-      queryKey: NotesQueries.keys.detail(id),
+      queryKey: NotesQueries.keys.detail(publicId),
       queryFn: ({ signal }) =>
-        apiClient<Schemas.GetNoteApiResponse>(`/notes/${id}`, getToken, {
+        apiClient<Schemas.GetNoteApiResponse>(`/notes/${publicId}`, getToken, {
           signal,
         }),
     });
@@ -56,14 +56,14 @@ export function useUpdateNote() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, body }: { id: number; body: Schemas.UpdateNoteApiRequest }) =>
-      apiClient<Schemas.UpdateNoteApiResponse>(`/notes/${id}`, getToken, {
+    mutationFn: ({ publicId, body }: { publicId: string; body: Schemas.UpdateNoteApiRequest }) =>
+      apiClient<Schemas.UpdateNoteApiResponse>(`/notes/${publicId}`, getToken, {
         method: "PATCH",
         body: JSON.stringify(body),
       }),
     onSuccess: async (response) => {
       if (response.note) {
-        queryClient.setQueryData(NotesQueries.keys.detail(response.note.id), response);
+        queryClient.setQueryData(NotesQueries.keys.detail(response.note.publicId), response);
       }
       await queryClient.invalidateQueries({
         queryKey: NotesQueries.keys.all(),
@@ -80,9 +80,10 @@ export function useDeleteNote() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => apiClient<void>(`/notes/${id}`, getToken, { method: "DELETE" }),
-    onSuccess: async (_data, id) => {
-      queryClient.removeQueries({ queryKey: NotesQueries.keys.detail(id) });
+    mutationFn: (publicId: string) =>
+      apiClient<void>(`/notes/${publicId}`, getToken, { method: "DELETE" }),
+    onSuccess: async (_data, publicId) => {
+      queryClient.removeQueries({ queryKey: NotesQueries.keys.detail(publicId) });
       await queryClient.invalidateQueries({
         queryKey: NotesQueries.keys.all(),
       });

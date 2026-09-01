@@ -4,11 +4,11 @@ import { useDeleteNote } from "./-data";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/shadcn/ui/button";
 
-const NoteCard = ({ note }: { note: Schemas.Note }) => {
+const NoteCard = ({ note }: { note: Schemas.NoteWithStatus }) => {
   const deleteMutation = useDeleteNote();
 
   return (
-    <Link to="/notes/$noteId" params={{ noteId: String(note.id) }}>
+    <Link to="/notes/$noteId" params={{ noteId: note.publicId }}>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>{note.title}</CardTitle>
@@ -16,7 +16,7 @@ const NoteCard = ({ note }: { note: Schemas.Note }) => {
             variant="destructive"
             size="sm"
             disabled={deleteMutation.isPending}
-            onClick={() => deleteMutation.mutate(note.id)}
+            onClick={() => deleteMutation.mutate(note.publicId)}
           >
             Delete
           </Button>

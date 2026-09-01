@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_authenticated/notes/$noteId/")({
 });
 
 function NoteDetailPage() {
-  const noteId = Number(Route.useParams().noteId);
+  const noteId = Route.useParams().noteId;
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
@@ -30,7 +30,7 @@ function NoteDetailPage() {
   // DEV_NOTE: mutateAsync used here — need to await save before closing the form.
   async function handleSubmit(value: Schemas.NoteBase) {
     await updateNote.mutateAsync({
-      id: noteId,
+      publicId: noteId,
       body: { note: value },
     });
     setIsEditing(false);

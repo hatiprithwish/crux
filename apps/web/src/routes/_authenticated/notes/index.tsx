@@ -31,7 +31,7 @@ function NotesPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {notes.map((note) => (
-            <NoteCard key={note.id} note={note} />
+            <NoteCard key={note.publicId} note={note} />
           ))}
         </div>
       )}

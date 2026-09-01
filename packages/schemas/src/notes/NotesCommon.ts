@@ -26,8 +26,10 @@ export const ZNoteBase = z.object({
 export type NoteBase = z.infer<typeof ZNoteBase>;
 
 // Whole Note Body — DB shape (status stored as integer)
+// DEV_NOTE: id is the internal autoincrement PK — used by DAL/Repo for joins only, NEVER sent to a client
 export const ZNote = ZNoteBase.extend({
   id: z.number(),
+  publicId: z.string(),
   userId: z.string(),
   status: z.nativeEnum(NoteStatusIntEnum),
   createdAt: z.date(),
@@ -35,8 +37,8 @@ export const ZNote = ZNoteBase.extend({
 });
 export type Note = z.infer<typeof ZNote>;
 
-// API response shape — includes both int and label
-export interface NoteWithStatus extends Note {
+// API response shape — includes both int and label; id is structurally omitted, publicId is client-facing
+export type NoteWithStatus = Omit<Note, "id"> & {
   noteStatus: NoteStatusIntEnum;
   noteStatusLabel: NoteStatusLabelEnum;
-}
+};

@@ -1,0 +1,21 @@
+meta {
+  name: Range query after unlog
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{host}}/trackers/{{trackerPublicId}}/entries?from=2026-03-01&to=2026-03-03
+  auth: none
+}
+
+tests {
+  test("returns 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("only the two remaining days come back", function() {
+    const dates = res.body.entries.map((entry) => entry.localDate).sort();
+    expect(dates).to.eql(["2026-03-02", "2026-03-03"]);
+  });
+}

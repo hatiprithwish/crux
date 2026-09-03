@@ -1,0 +1,51 @@
+meta {
+  name: Create a timer tracker
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{host}}/trackers
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "tracker": {
+      "name": "Bruno Time",
+      "activeFrom": "2026-03-01",
+      "manifest": {
+        "control": "timer",
+        "metrics": [],
+        "target": null,
+        "step": null,
+        "entryMode": "live",
+        "schedule": { "type": "daily" },
+        "compute": null
+      }
+    },
+    "metric": {
+      "mode": "new",
+      "metric": {
+        "key": "time_duration_seconds",
+        "name": "Duration",
+        "semanticType": "duration_seconds",
+        "canonicalUnit": "seconds",
+        "defaultAgg": "sum",
+        "direction": "neutral",
+        "dateAttribution": "start"
+      }
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+}
+
+script:post-response {
+  bru.setVar("timeTrackerPublicId", res.body.tracker.publicId);
+}

@@ -33,5 +33,50 @@ function AuthenticatedLayout() {
     );
   }
 
-  return <Outlet />;
+  return (
+    <div className="min-h-screen">
+      <AppNav />
+      <Outlet />
+    </div>
+  );
+}
+
+// DEV_NOTE: every authenticated screen shares this — before it existed, /trackers and /entities were
+// only reachable by typing the URL, which made the read surfaces (heatmap, breakdown, entity rollup)
+// effectively invisible.
+function AppNav() {
+  return (
+    <nav className="border-b">
+      <div className="mx-auto flex max-w-2xl items-center gap-1 px-6 py-3">
+        <Button asChild variant="ghost" size="sm">
+          <Link
+            to="/trackers"
+            activeProps={{ className: "bg-accent text-accent-foreground" }}
+            activeOptions={{ exact: false }}
+          >
+            Today
+          </Link>
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <Link
+            to="/entities"
+            activeProps={{ className: "bg-accent text-accent-foreground" }}
+            activeOptions={{ exact: false }}
+          >
+            Entities
+          </Link>
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <Link to="/notes" activeProps={{ className: "bg-accent text-accent-foreground" }}>
+            Notes
+          </Link>
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <Link to="/archived" activeProps={{ className: "bg-accent text-accent-foreground" }}>
+            Archived
+          </Link>
+        </Button>
+      </div>
+    </nav>
+  );
 }

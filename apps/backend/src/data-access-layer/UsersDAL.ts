@@ -71,7 +71,7 @@ export default class UsersDAL {
       await this.db
         .insert(users)
         .values({
-          publicId: Utility.generatePublicId(),
+          publicId: Utility.generatePublicId("usr_"),
           clerkId: params.clerkId,
           email: params.email,
           role: params.role,

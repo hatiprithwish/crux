@@ -1,0 +1,17 @@
+docs {
+  # crux-backend
+
+  Run the whole collection, not one folder at a time:
+
+  ```
+  bru run -r --env local
+  ```
+
+  The money, time and rollup folders reuse publicIds that earlier folders set as runtime vars, and
+  those vars only live for the length of one run. Folders execute alphabetically — entities → money
+  → notes → rollup → time → trackers — which is the order those dependencies need.
+
+  Everything here talks to the manifest engine: a habit, an expense and a timer session are all the
+  same `POST /trackers/:publicId/entries`, differing only in the quick-add payload their
+  `manifest.control` declares.
+}

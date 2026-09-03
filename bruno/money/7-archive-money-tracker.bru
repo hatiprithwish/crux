@@ -1,0 +1,16 @@
+meta {
+  name: Archive the Money tracker
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{host}}/trackers/{{moneyTrackerPublicId}}
+  auth: none
+}
+
+tests {
+  test("returns 200", function() {
+    expect(res.status).to.equal(200);
+  });
+}

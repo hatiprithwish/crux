@@ -1,5 +1,5 @@
 {
-  "name": "scaffold-worker",
+  "name": "crux-worker",
   "main": "src/index.ts",
   // DEV_NOTE: keep it up to date with the current date.
   "compatibility_date": "2026-05-22",
@@ -7,6 +7,8 @@
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "ALLOWED_CORS_ORIGIN": "http://localhost:3000",
+    // DEV_NOTE: "local" is the only value that enables the checkAuth bypass in AuthMiddleware.ts — must be an exact match, staging/production below override this.
+    "APP_ENV": "local",
   },
   "observability": {
     "logs": {
@@ -17,17 +19,18 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "scaffold-db",
-      "database_id": "c950b22e-c50c-4840-bb9b-f91143980fe1",
+      "database_name": "crux-db",
+      "database_id": "8c4994d0-094e-42ef-a1bf-5d2cc24c8b82",
       "migrations_dir": "src/db/migrations",
       "remote": true,
     },
   ],
   "env": {
     "staging": {
-      "name": "scaffold-worker-staging",
+      "name": "crux-worker-staging",
       "vars": {
-        "ALLOWED_CORS_ORIGIN": "http://localhost:3000,https://scaffold-web-staging.hatiprithwish.workers.dev",
+        "ALLOWED_CORS_ORIGIN": "http://localhost:3000,https://crux-web-staging.hatiprithwish.workers.dev",
+        "APP_ENV": "staging",
       },
       "observability": {
         "logs": {
@@ -38,17 +41,18 @@
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "scaffold-db",
-          "database_id": "c950b22e-c50c-4840-bb9b-f91143980fe1",
+          "database_name": "crux-db",
+          "database_id": "8c4994d0-094e-42ef-a1bf-5d2cc24c8b82",
           "migrations_dir": "src/db/migrations",
           "remote": true,
         },
       ],
     },
     "production": {
-      "name": "scaffold-worker",
+      "name": "crux-worker",
       "vars": {
-        "ALLOWED_CORS_ORIGIN": "https://scaffold-web.hatiprithwish.workers.dev",
+        "ALLOWED_CORS_ORIGIN": "https://crux-web.hatiprithwish.workers.dev",
+        "APP_ENV": "production",
       },
       "observability": {
         "logs": {
@@ -59,12 +63,17 @@
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "scaffold-db",
-          "database_id": "c950b22e-c50c-4840-bb9b-f91143980fe1",
+          "database_name": "crux-db",
+          "database_id": "8c4994d0-094e-42ef-a1bf-5d2cc24c8b82",
           "migrations_dir": "src/db/migrations",
           "remote": true,
         },
       ],
+      // DEV_NOTE: architecture.md §4.1 point 3 — weekly orphan scan, Sunday 00:00 UTC. Production
+      // only: staging has no real user data for a referential-integrity check to be meaningful.
+      "triggers": {
+        "crons": ["0 0 * * 0"],
+      },
     },
   },
 }

@@ -8,7 +8,7 @@
 
 ### Backend (`apps/backend`)
 
-- Change worker name in `apps/web/wrangler.jsonc` and `package.json`
+- Change worker name in `apps/backend/wrangler.jsonc` and `package.json`
 - Create a D1 database
 - Update `database_id` in `apps/backend/wrangler.jsonc` with the returned ID
 - Add secrets via `wrangler secret put <KEY_NAME>`

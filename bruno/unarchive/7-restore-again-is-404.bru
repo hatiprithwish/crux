@@ -1,0 +1,17 @@
+meta {
+  name: Restoring a live tracker is a 404, not a silent rewrite
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{host}}/trackers/{{restoreTrackerPublicId}}/unarchive
+  body: none
+  auth: none
+}
+
+tests {
+  test("returns 404", function() {
+    expect(res.status).to.equal(404);
+  });
+}

@@ -1,0 +1,20 @@
+meta {
+  name: Read the running session
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{host}}/trackers/{{timeTrackerPublicId}}/running
+  auth: none
+}
+
+tests {
+  test("returns 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("it is the session we started", function() {
+    expect(res.body.session.publicId).to.equal(bru.getVar("sessionPublicId"));
+  });
+}

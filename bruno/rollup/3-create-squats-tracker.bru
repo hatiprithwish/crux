@@ -1,0 +1,51 @@
+meta {
+  name: Create the Squats tracker
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{host}}/trackers
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "tracker": {
+      "name": "Bruno Squats",
+      "activeFrom": "2026-04-01",
+      "manifest": {
+        "control": "increment",
+        "metrics": [],
+        "target": null,
+        "step": 5,
+        "entryMode": "retro",
+        "schedule": { "type": "daily" },
+        "compute": null
+      }
+    },
+    "metric": {
+      "mode": "new",
+      "metric": {
+        "key": "bruno_rollup_squats",
+        "name": "Squats",
+        "semanticType": "count",
+        "canonicalUnit": "count",
+        "defaultAgg": "sum",
+        "direction": "higher_better",
+        "dateAttribution": "start"
+      }
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+}
+
+script:post-response {
+  bru.setVar("squatsTrackerPublicId", res.body.tracker.publicId);
+}

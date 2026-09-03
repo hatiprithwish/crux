@@ -17,45 +17,56 @@ export default class NotesRepo {
     };
   }
 
-  async createNote(params: Schemas.CreateNoteApiRequest & { userId: string }) {
+  async createNote(
+    params: Schemas.CreateNoteApiRequest & { userId: string },
+  ): Promise<Schemas.CreateNoteApiResponse> {
     const result = await this.dal.createNote({
       userId: params.userId,
       title: params.note.title,
       body: params.note.body,
     });
-    if (result.isSuccess && result.note) {
-      result.note = this.withStatusLabel(result.note);
-    }
-    return result;
+    return {
+      isSuccess: result.isSuccess,
+      message: result.message,
+      note: result.note ? this.withStatusLabel(result.note) : undefined,
+    };
   }
 
-  async getNoteDetails(params: { userId: string; publicId: string }) {
+  async getNoteDetails(params: {
+    userId: string;
+    publicId: string;
+  }): Promise<Schemas.GetNoteApiResponse> {
     const result = await this.dal.getNoteDetails(params);
-    if (result.isSuccess && result.note) {
-      result.note = this.withStatusLabel(result.note);
-    }
-    return result;
+    return {
+      isSuccess: result.isSuccess,
+      message: result.message,
+      note: result.note ? this.withStatusLabel(result.note) : undefined,
+    };
   }
 
-  async getNotes(params: { userId: string }) {
+  async getNotes(params: { userId: string }): Promise<Schemas.GetNotesApiResponse> {
     const result = await this.dal.getNotes(params);
-    if (result.isSuccess && result.notes) {
-      result.notes = result.notes.map((note) => this.withStatusLabel(note));
-    }
-    return result;
+    return {
+      isSuccess: result.isSuccess,
+      message: result.message,
+      notes: result.notes?.map((note) => this.withStatusLabel(note)),
+    };
   }
 
-  async updateNote(params: Schemas.UpdateNoteApiRequest & { userId: string; publicId: string }) {
+  async updateNote(
+    params: Schemas.UpdateNoteApiRequest & { userId: string; publicId: string },
+  ): Promise<Schemas.UpdateNoteApiResponse> {
     const result = await this.dal.updateNote({
       publicId: params.publicId,
       userId: params.userId,
       title: params.note.title ?? null,
       body: params.note.body ?? null,
     });
-    if (result.isSuccess && result.note) {
-      result.note = this.withStatusLabel(result.note);
-    }
-    return result;
+    return {
+      isSuccess: result.isSuccess,
+      message: result.message,
+      note: result.note ? this.withStatusLabel(result.note) : undefined,
+    };
   }
 
   async deleteNote(params: { userId: string; publicId: string }) {

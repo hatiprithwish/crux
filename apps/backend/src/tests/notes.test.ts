@@ -32,6 +32,11 @@ vi.mock("@/providers/logger", () => ({
   withRequestContext: vi.fn().mockImplementation((_id, next) => next()),
 }));
 
+// DEV_NOTE: wrangler.jsonc's top-level vars sets APP_ENV=local for this test env too, which would
+// bypass the Clerk mock below entirely (see AuthMiddleware.ts). Force it off so these tests keep
+// exercising the real checkAuth → Clerk path they're actually testing.
+const testEnv = { ...env, APP_ENV: "staging" as const };
+
 function makeRequest(path: string, method = "GET", body?: unknown) {
   return new Request(`http://localhost${path}`, {
     method,
@@ -57,7 +62,7 @@ describe("Notes routes (authenticated)", () => {
 
   it("GET /notes returns 200", async () => {
     const req = makeRequest("/notes");
-    const res = await worker.fetch(req, env, ctx);
+    const res = await worker.fetch(req, testEnv, ctx);
     await waitOnExecutionContext(ctx);
     expect(res.status).toBe(200);
   });
@@ -66,7 +71,7 @@ describe("Notes routes (authenticated)", () => {
     const req = makeRequest("/notes", "POST", {
       note: { title: "Test note", body: "Hello world" },
     });
-    const res = await worker.fetch(req, env, ctx);
+    const res = await worker.fetch(req, testEnv, ctx);
     await waitOnExecutionContext(ctx);
     expect(res.status).toBe(201);
   });
@@ -82,7 +87,7 @@ describe("Unauthenticated requests", () => {
 
     const ctx = createExecutionContext();
     const req = makeRequest("/notes");
-    const res = await worker.fetch(req, env, ctx);
+    const res = await worker.fetch(req, testEnv, ctx);
     await waitOnExecutionContext(ctx);
     expect(res.status).toBe(401);
   });

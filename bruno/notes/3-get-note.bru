@@ -1,0 +1,26 @@
+meta {
+  name: Get note
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{host}}/notes/{{notePublicId}}
+  auth: none
+}
+
+tests {
+  test("returns 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("returns the note created in this run", function() {
+    expect(res.body.note.publicId).to.equal(bru.getVar("notePublicId"));
+    expect(res.body.note.title).to.equal("Bruno Test Note");
+  });
+
+  test("carries the status enum + label pair", function() {
+    expect(res.body.note.noteStatus).to.be.a("number");
+    expect(res.body.note.noteStatusLabel).to.be.a("string");
+  });
+}

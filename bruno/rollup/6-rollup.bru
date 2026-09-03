@@ -1,0 +1,30 @@
+meta {
+  name: Roll both trackers up against the entity
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{host}}/entities/{{rollupEntityPublicId}}/rollup?from=2026-04-01&to=2026-04-01
+  auth: none
+}
+
+tests {
+  test("returns 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("each metric is summed exactly once", function() {
+    const byKey = {};
+    res.body.rollup.metrics.forEach((row) => { byKey[row.metricKey] = row; });
+    expect(byKey["bruno_rollup_pushups"].sum).to.equal(10);
+    expect(byKey["bruno_rollup_pushups"].count).to.equal(1);
+    expect(byKey["bruno_rollup_squats"].sum).to.equal(5);
+    expect(byKey["bruno_rollup_squats"].count).to.equal(1);
+  });
+
+  test("same unit, so the two metrics combine into one number", function() {
+    expect(res.body.rollup.combined.canonicalUnit).to.equal("count");
+    expect(res.body.rollup.combined.sum).to.equal(15);
+  });
+}

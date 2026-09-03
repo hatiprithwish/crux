@@ -1,0 +1,25 @@
+meta {
+  name: Changing kind is rejected
+  type: http
+  seq: 8
+}
+
+patch {
+  url: {{host}}/entities/{{accountPublicId}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "entity": {
+      "kind": "project"
+    }
+  }
+}
+
+tests {
+  test("returns 400 — kind is immutable, past entries are linked under a role that mirrors it", function() {
+    expect(res.status).to.equal(400);
+  });
+}

@@ -1,0 +1,16 @@
+meta {
+  name: Archive the squats tracker
+  type: http
+  seq: 10
+}
+
+delete {
+  url: {{host}}/trackers/{{squatsTrackerPublicId}}
+  auth: none
+}
+
+tests {
+  test("returns 200", function() {
+    expect(res.status).to.equal(200);
+  });
+}

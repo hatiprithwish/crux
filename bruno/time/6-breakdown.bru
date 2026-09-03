@@ -1,0 +1,23 @@
+meta {
+  name: Breakdown sliced by project
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{host}}/trackers/{{timeTrackerPublicId}}/breakdown?from=2026-03-01&to=2030-01-01&role=project
+  auth: none
+}
+
+tests {
+  test("returns 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("the labelled session is grouped under its project", function() {
+    const row = res.body.rows.find((entry) => entry.label === "Bruno deep work");
+    expect(row).to.not.equal(undefined);
+    expect(row.entryCount).to.be.at.least(1);
+    expect(row.entityPublicId).to.equal(bru.getVar("projectPublicId"));
+  });
+}

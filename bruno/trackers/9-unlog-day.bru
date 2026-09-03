@@ -1,0 +1,32 @@
+meta {
+  name: Unlog a day
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{host}}/trackers/{{trackerPublicId}}/entries
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "payload": {
+      "control": "toggle",
+      "date": "2026-03-01",
+      "completed": false
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("the day's facts are gone, not zeroed", function() {
+    expect(res.body.todaySum).to.equal(null);
+    expect(res.body.todayCount).to.equal(0);
+  });
+}

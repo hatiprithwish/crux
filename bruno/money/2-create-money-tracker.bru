@@ -1,0 +1,56 @@
+meta {
+  name: Create the Money tracker (amount_pad + transfer compute)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{host}}/trackers
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "tracker": {
+      "name": "Bruno Money",
+      "activeFrom": "2026-03-01",
+      "manifest": {
+        "control": "amount_pad",
+        "metrics": ["money_transfer_amount"],
+        "target": null,
+        "step": null,
+        "entryMode": "retro",
+        "schedule": { "type": "daily" },
+        "compute": "money.transfer.v1"
+      }
+    },
+    "metric": {
+      "mode": "new",
+      "metric": {
+        "key": "money_expense_amount",
+        "name": "Expense amount",
+        "semanticType": "currency_minor",
+        "canonicalUnit": "currency_minor",
+        "defaultAgg": "sum",
+        "direction": "lower_better",
+        "dateAttribution": "start"
+      }
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("the compute module and its required metric are both declared", function() {
+    expect(res.body.tracker.manifest.compute).to.equal("money.transfer.v1");
+    expect(res.body.tracker.manifest.metrics).to.include("money_transfer_amount");
+  });
+}
+
+script:post-response {
+  bru.setVar("moneyTrackerPublicId", res.body.tracker.publicId);
+}

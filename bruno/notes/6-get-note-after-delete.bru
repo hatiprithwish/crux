@@ -1,0 +1,16 @@
+meta {
+  name: Get note after delete
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{host}}/notes/{{notePublicId}}
+  auth: none
+}
+
+tests {
+  test("returns 404 — the delete actually took effect", function() {
+    expect(res.status).to.equal(404);
+  });
+}

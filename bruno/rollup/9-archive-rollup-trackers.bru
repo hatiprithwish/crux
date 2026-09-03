@@ -1,0 +1,16 @@
+meta {
+  name: Archive the pushups tracker
+  type: http
+  seq: 9
+}
+
+delete {
+  url: {{host}}/trackers/{{pushupsTrackerPublicId}}
+  auth: none
+}
+
+tests {
+  test("returns 200", function() {
+    expect(res.status).to.equal(200);
+  });
+}

@@ -1,0 +1,37 @@
+meta {
+  name: Transfer between accounts (compute escape hatch)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{host}}/trackers/{{moneyTrackerPublicId}}/compute
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "compute": {
+      "key": "money.transfer.v1",
+      "payload": {
+        "fromAccountPublicId": "{{accountPublicId}}",
+        "toAccountPublicId": "{{secondAccountPublicId}}",
+        "amountMinor": 2000,
+        "currency": "INR",
+        "date": "2026-03-02"
+      }
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("both sides share one transferGroupId", function() {
+    expect(res.body.transfer.transferGroupId).to.be.a("string");
+    expect(res.body.transfer.amountMinor).to.equal(2000);
+  });
+}

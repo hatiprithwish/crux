@@ -1,0 +1,34 @@
+meta {
+  name: Stop the session
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{host}}/trackers/{{timeTrackerPublicId}}/entries
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "payload": {
+      "control": "timer",
+      "timer": {
+        "action": "stop",
+        "entryPublicId": "{{sessionPublicId}}"
+      }
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("the session is closed and its duration is written", function() {
+    expect(res.body.entry.endedAt).to.not.equal(null);
+    expect(res.body.entry.durationSeconds).to.be.at.least(0);
+  });
+}

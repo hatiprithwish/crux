@@ -1,0 +1,66 @@
+meta {
+  name: Create a toggle tracker (the old "habit")
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{host}}/trackers
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "tracker": {
+      "name": "Bruno Test Habit",
+      "activeFrom": "2026-03-01",
+      "manifest": {
+        "control": "toggle",
+        "metrics": [],
+        "target": null,
+        "step": null,
+        "entryMode": "retro",
+        "schedule": { "type": "daily" },
+        "compute": null
+      }
+    },
+    "metric": {
+      "mode": "new",
+      "metric": {
+        "name": "Bruno Test Habit",
+        "semanticType": "boolean",
+        "canonicalUnit": "boolean",
+        "defaultAgg": "sum",
+        "direction": "higher_better",
+        "dateAttribution": "start"
+      }
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("isSuccess is true", function() {
+    expect(res.body.isSuccess).to.equal(true);
+  });
+
+  test("response carries publicIds, never the internal ids", function() {
+    expect(res.body.tracker.publicId).to.be.a("string");
+    expect(res.body.tracker.primaryMetricPublicId).to.be.a("string");
+    expect(res.body.tracker.id).to.equal(undefined);
+    expect(res.body.tracker.primaryMetricId).to.equal(undefined);
+  });
+
+  test("the Repo added the primary metric to manifest.metrics", function() {
+    expect(res.body.tracker.manifest.metrics).to.include(res.body.tracker.primaryMetricKey);
+  });
+}
+
+script:post-response {
+  bru.setVar("trackerPublicId", res.body.tracker.publicId);
+  bru.setVar("trackerMetricPublicId", res.body.tracker.primaryMetricPublicId);
+}

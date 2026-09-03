@@ -1,0 +1,21 @@
+meta {
+  name: A window with nothing attributed
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{host}}/entities/{{rollupEntityPublicId}}/rollup?from=2020-01-01&to=2020-01-31
+  auth: none
+}
+
+tests {
+  test("returns 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("no metrics and no combined total — missing data is neutral, never zero (invariant 7)", function() {
+    expect(res.body.rollup.metrics.length).to.equal(0);
+    expect(res.body.rollup.combined).to.equal(null);
+  });
+}

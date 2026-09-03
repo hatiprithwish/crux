@@ -1,0 +1,22 @@
+meta {
+  name: List trackers with today's state
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{host}}/trackers?withToday=true
+  auth: none
+}
+
+tests {
+  test("returns 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("the created tracker is present with a today row", function() {
+    const row = res.body.today.find((entry) => entry.tracker.publicId === bru.getVar("trackerPublicId"));
+    expect(row).to.not.equal(undefined);
+    expect(row.streak).to.be.a("number");
+  });
+}

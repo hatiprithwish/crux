@@ -1,0 +1,21 @@
+meta {
+  name: Slice the rollup by a role nothing was linked under
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{host}}/entities/{{rollupEntityPublicId}}/rollup?from=2026-04-01&to=2026-04-01&role=account
+  auth: none
+}
+
+tests {
+  test("returns 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("no metrics — invariant 6, exactly one role at a time", function() {
+    expect(res.body.rollup.role).to.equal("account");
+    expect(res.body.rollup.metrics.length).to.equal(0);
+  });
+}

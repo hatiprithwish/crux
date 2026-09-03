@@ -1,0 +1,21 @@
+meta {
+  name: It is back in the live list
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{host}}/trackers
+  auth: none
+}
+
+tests {
+  test("returns 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("the restored tracker is listed again", function() {
+    const ids = res.body.trackers.map((tracker) => tracker.publicId);
+    expect(ids).to.include(bru.getVar("restoreTrackerPublicId"));
+  });
+}

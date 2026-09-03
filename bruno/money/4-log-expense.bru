@@ -1,0 +1,47 @@
+meta {
+  name: Log a foreign-currency expense
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{host}}/trackers/{{moneyTrackerPublicId}}/entries
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "payload": {
+      "control": "amount_pad",
+      "date": "2026-03-01",
+      "amountMinor": 5000,
+      "currency": "USD",
+      "fxRate": 83,
+      "entityLinks": [
+        { "entityPublicId": "{{accountPublicId}}", "role": "account" },
+        { "entityPublicId": "{{categoryPublicId}}", "role": "tag" }
+      ]
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("value_base is the home-currency conversion at write time (invariant 3)", function() {
+    const value = res.body.entry.values[0];
+    expect(value.currency).to.equal("USD");
+    expect(value.fxRate).to.equal(83);
+    expect(value.valueBase).to.equal(5000 * 83);
+  });
+
+  test("both entity links come back as publicIds, one per role", function() {
+    const roles = {};
+    res.body.entry.entities.forEach((link) => { roles[link.role] = link.entityPublicId; });
+    expect(roles.account).to.equal(bru.getVar("accountPublicId"));
+    expect(roles.tag).to.equal(bru.getVar("categoryPublicId"));
+  });
+}

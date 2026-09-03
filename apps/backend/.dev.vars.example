@@ -14,3 +14,5 @@ CLERK_SECRET_KEY=       # runtime-only
 
 CLOUDFLARE_API_TOKEN=   # ci-required
 CLOUDFLARE_ACCOUNT_ID=  # ci-required
+
+DEV_USER_ID=            # local-only — dev identity used by the APP_ENV=local auth bypass, never set in staging/production

@@ -1,0 +1,24 @@
+meta {
+  name: Heatmap over the logged range
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{host}}/trackers/{{trackerPublicId}}/heatmap?from=2026-03-01&to=2026-03-04
+  auth: none
+}
+
+tests {
+  test("returns 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("logged days read as met, the unlogged one as no_data (invariant 7 — never zero)", function() {
+    const byDate = {};
+    res.body.days.forEach((day) => { byDate[day.localDate] = day.state; });
+    expect(byDate["2026-03-01"]).to.equal("met");
+    expect(byDate["2026-03-03"]).to.equal("met");
+    expect(byDate["2026-03-04"]).to.equal("no_data");
+  });
+}

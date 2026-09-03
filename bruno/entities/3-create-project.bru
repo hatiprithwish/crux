@@ -1,0 +1,30 @@
+meta {
+  name: Create project entity
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{host}}/entities
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "entity": {
+      "name": "Bruno Book",
+      "kind": "project"
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+}
+
+script:post-response {
+  bru.setVar("projectPublicId", res.body.entity.publicId);
+}

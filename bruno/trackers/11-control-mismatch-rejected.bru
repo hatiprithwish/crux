@@ -1,0 +1,26 @@
+meta {
+  name: A payload for the wrong control is rejected
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{host}}/trackers/{{trackerPublicId}}/entries
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "payload": {
+      "control": "increment",
+      "date": "2026-03-02"
+    }
+  }
+}
+
+tests {
+  test("returns 400 — the manifest says this tracker is a toggle", function() {
+    expect(res.status).to.equal(400);
+  });
+}

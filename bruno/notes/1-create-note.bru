@@ -1,0 +1,43 @@
+meta {
+  name: Create note
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{host}}/notes
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "note": {
+      "title": "Bruno Test Note",
+      "body": "Created by the Bruno collection run"
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("isSuccess is true", function() {
+    expect(res.body.isSuccess).to.equal(true);
+  });
+
+  test("response carries publicId, not the internal id", function() {
+    expect(res.body.note.publicId).to.be.a("string");
+    expect(res.body.note.id).to.equal(undefined);
+  });
+
+  test("echoes the submitted title", function() {
+    expect(res.body.note.title).to.equal("Bruno Test Note");
+  });
+}
+
+script:post-response {
+  bru.setVar("notePublicId", res.body.note.publicId);
+}

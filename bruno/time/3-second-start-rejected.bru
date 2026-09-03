@@ -1,0 +1,30 @@
+meta {
+  name: A second start while one runs is rejected
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{host}}/trackers/{{timeTrackerPublicId}}/entries
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "payload": {
+      "control": "timer",
+      "timer": {
+        "action": "start",
+        "label": "Bruno second task",
+        "entityLinks": []
+      }
+    }
+  }
+}
+
+tests {
+  test("returns 400 — one running session per tracker", function() {
+    expect(res.status).to.equal(400);
+  });
+}

@@ -1,0 +1,32 @@
+meta {
+  name: Transferring an account to itself is rejected
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{host}}/trackers/{{moneyTrackerPublicId}}/compute
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "compute": {
+      "key": "money.transfer.v1",
+      "payload": {
+        "fromAccountPublicId": "{{accountPublicId}}",
+        "toAccountPublicId": "{{accountPublicId}}",
+        "amountMinor": 2000,
+        "currency": "INR",
+        "date": "2026-03-02"
+      }
+    }
+  }
+}
+
+tests {
+  test("returns 400", function() {
+    expect(res.status).to.equal(400);
+  });
+}

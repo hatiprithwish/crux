@@ -1,0 +1,30 @@
+meta {
+  name: A partial update leaves untouched fields alone
+  type: http
+  seq: 7
+}
+
+patch {
+  url: {{host}}/entities/{{accountPublicId}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "entity": {
+      "name": "Bruno Cash"
+    }
+  }
+}
+
+tests {
+  test("returns 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("emoji survives a rename that never mentioned it", function() {
+    expect(res.body.entity.name).to.equal("Bruno Cash");
+    expect(res.body.entity.emoji).to.equal("💳");
+  });
+}

@@ -1,0 +1,31 @@
+meta {
+  name: Declare the transfer metric
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{host}}/metrics
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "metric": {
+      "key": "money_transfer_amount",
+      "name": "Transfer amount",
+      "semanticType": "currency_minor",
+      "canonicalUnit": "currency_minor",
+      "defaultAgg": "sum",
+      "direction": "neutral",
+      "dateAttribution": "start"
+    }
+  }
+}
+
+tests {
+  test("201 on first run, 500 once it already exists (metrics are unique per user+key)", function() {
+    expect([201, 500]).to.include(res.status);
+  });
+}

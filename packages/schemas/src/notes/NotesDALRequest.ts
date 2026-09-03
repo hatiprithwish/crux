@@ -9,4 +9,4 @@ export type FindNoteDALRequest = Pick<Note, "publicId" | "userId">;
 export type GetNotesDALRequest = Pick<Note, "userId">;
 
 export type UpdateNoteDALRequest = FindNoteDALRequest &
-  NullableDALFields<Omit<Note, "id" | "publicId" | "userId" | "createdAt">>;
+  NullableDALFields<Omit<Note, "id" | "publicId" | "userId" | "createdAt" | "status">>;

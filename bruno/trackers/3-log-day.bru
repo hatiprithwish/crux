@@ -1,0 +1,37 @@
+meta {
+  name: Log a day (toggle quick-add)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{host}}/trackers/{{trackerPublicId}}/entries
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "payload": {
+      "control": "toggle",
+      "date": "2026-03-01",
+      "completed": true
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("the entry lands on the requested date", function() {
+    expect(res.body.entry.localDate).to.equal("2026-03-01");
+  });
+
+  test("entry is publicId-only", function() {
+    expect(res.body.entry.publicId).to.be.a("string");
+    expect(res.body.entry.id).to.equal(undefined);
+    expect(res.body.entry.trackerId).to.equal(undefined);
+  });
+}

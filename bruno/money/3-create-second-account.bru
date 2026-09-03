@@ -1,0 +1,30 @@
+meta {
+  name: Create a second account (transfers need two)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{host}}/entities
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "entity": {
+      "name": "Bruno Bank",
+      "kind": "account"
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+}
+
+script:post-response {
+  bru.setVar("secondAccountPublicId", res.body.entity.publicId);
+}

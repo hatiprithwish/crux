@@ -1,0 +1,42 @@
+meta {
+  name: Start a session
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{host}}/trackers/{{timeTrackerPublicId}}/entries
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "payload": {
+      "control": "timer",
+      "timer": {
+        "action": "start",
+        "label": "Bruno deep work",
+        "entityLinks": [
+          { "entityPublicId": "{{projectPublicId}}", "role": "project" }
+        ]
+      }
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("the session is open — no end, no duration yet (invariant 7)", function() {
+    expect(res.body.entry.entryKind).to.equal("interval");
+    expect(res.body.entry.endedAt).to.equal(null);
+    expect(res.body.entry.durationSeconds).to.equal(null);
+  });
+}
+
+script:post-response {
+  bru.setVar("sessionPublicId", res.body.entry.publicId);
+}

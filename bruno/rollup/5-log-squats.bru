@@ -1,0 +1,34 @@
+meta {
+  name: Log squats, attributed to the entity
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{host}}/trackers/{{squatsTrackerPublicId}}/entries
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "payload": {
+      "control": "increment",
+      "date": "2026-04-01",
+      "entityLinks": [
+        { "entityPublicId": "{{rollupEntityPublicId}}", "role": "project" }
+      ]
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("the entry carries its attribution back", function() {
+    expect(res.body.entry.entities[0].role).to.equal("project");
+    expect(res.body.entry.entities[0].entityPublicId).to.equal(bru.getVar("rollupEntityPublicId"));
+  });
+}

@@ -1,0 +1,36 @@
+meta {
+  name: Create account entity
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{host}}/entities
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "entity": {
+      "name": "Bruno Cash",
+      "kind": "account"
+    }
+  }
+}
+
+tests {
+  test("returns 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("response carries publicId, not the internal id", function() {
+    expect(res.body.entity.publicId).to.be.a("string");
+    expect(res.body.entity.id).to.equal(undefined);
+    expect(res.body.entity.parentId).to.equal(undefined);
+  });
+}
+
+script:post-response {
+  bru.setVar("accountPublicId", res.body.entity.publicId);
+}

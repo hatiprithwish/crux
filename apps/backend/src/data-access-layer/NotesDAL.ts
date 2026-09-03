@@ -15,7 +15,7 @@ export default class NotesDAL {
   }
 
   async createNote(params: Schemas.CreateNoteDALRequest) {
-    const response: Schemas.CreateNoteApiResponse = { isSuccess: false };
+    const response: Schemas.ApiResponse & { note?: Schemas.Note } = { isSuccess: false };
 
     try {
       const now = new Date();
@@ -51,7 +51,7 @@ export default class NotesDAL {
   }
 
   async getNoteDetails(params: Schemas.FindNoteDALRequest) {
-    const response: Schemas.GetNoteApiResponse = { isSuccess: false };
+    const response: Schemas.ApiResponse & { note?: Schemas.Note } = { isSuccess: false };
 
     try {
       const conditions: SQL[] = [
@@ -96,7 +96,7 @@ export default class NotesDAL {
   }
 
   async getNotes(params: Schemas.GetNotesDALRequest) {
-    const response: Schemas.GetNotesApiResponse = { isSuccess: false };
+    const response: Schemas.ApiResponse & { notes?: Schemas.Note[] } = { isSuccess: false };
 
     try {
       const notesResponse = await this.db
@@ -123,7 +123,7 @@ export default class NotesDAL {
   }
 
   async updateNote(params: Schemas.UpdateNoteDALRequest) {
-    const response: Schemas.UpdateNoteApiResponse = { isSuccess: false };
+    const response: Schemas.ApiResponse & { note?: Schemas.Note } = { isSuccess: false };
 
     try {
       const now = new Date();

@@ -17,7 +17,9 @@ export default defineConfig(({ mode }) => {
         org: env.SENTRY_ORG,
         project: env.SENTRY_PROJECT,
         authToken: env.SENTRY_AUTH_TOKEN,
-        tunnelRoute: true,
+        tunnelRoute: {
+          allowedDsns: [env.VITE_SENTRY_DSN],
+        },
       }),
       viteReact(),
       tailwindcss(),

@@ -12,14 +12,18 @@
 - Create a D1 database
 - Update `database_id` in `apps/backend/wrangler.jsonc` with the returned ID
 - Copy `.dev.vars.example` to `.dev.vars` and populate it for local dev
-- Add the runtime secrets to each deployed environment:
+- Add the runtime secrets to each deployed environment. Always go through
+  `pnpm --filter backend exec` — a bare `pnpm exec wrangler` from the repo root picks up whatever
+  wrangler is installed globally, finds no `wrangler.jsonc` there, and fails with
+  _"No environment found in configuration with name staging"_:
   ```bash
-  cd apps/backend
-  pnpm exec wrangler secret put CLERK_PUBLISHABLE_KEY --env staging
-  pnpm exec wrangler secret put CLERK_SECRET_KEY     --env staging
-  pnpm exec wrangler secret put CLERK_PUBLISHABLE_KEY --env production
-  pnpm exec wrangler secret put CLERK_SECRET_KEY     --env production
+  pnpm --filter backend exec wrangler secret put CLERK_PUBLISHABLE_KEY --env staging
+  pnpm --filter backend exec wrangler secret put CLERK_SECRET_KEY --env staging
+  pnpm --filter backend exec wrangler secret put CLERK_PUBLISHABLE_KEY --env production
+  pnpm --filter backend exec wrangler secret put CLERK_SECRET_KEY --env production
   ```
+  The target Worker must already exist, so run these _after_ the environment's first deploy.
+  Secrets apply immediately — no redeploy needed.
 - Run migrations: `pnpm --filter backend db:migrate`
 
 ### Run everything

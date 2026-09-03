@@ -6,6 +6,9 @@ on:
     paths:
       - "apps/backend/**"
       - "packages/schemas/**"
+  # DEV_NOTE: manual trigger is the rollback/redeploy path — the push filters above mean a
+  # revert that touches no app file would otherwise never redeploy.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -54,6 +57,26 @@ jobs:
             exit 1
           fi
           echo "✅ All secrets present"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Lint
+        run: pnpm --filter backend --filter @app/schemas lint
+
+      - name: Typecheck
+        run: pnpm --filter backend --filter @app/schemas typecheck
+
+      # DEV_NOTE: `pnpm --filter backend test` is deliberately NOT a gate here. The D1 binding is
+      # `remote: true` (wrangler.jsonc), so the suite runs every query against the real crux-db
+      # over the network — it is flaky in CI and would write test rows into live data. Make the
+      # suite hermetic (a local test-only D1 binding) before adding it back.
+
+      # DEV_NOTE: migrations run before the deploy so the new code never boots against an older
+      # schema. Safe to re-run — D1 keeps an applied-migrations ledger. NOTE: staging and
+      # production currently share one database, so this migrates production data too.
+      - name: Apply D1 migrations
+        run: pnpm --filter backend db:migrate:staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

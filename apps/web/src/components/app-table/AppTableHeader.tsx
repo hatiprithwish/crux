@@ -10,7 +10,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { ArrowsDownUp, CaretDown, CaretUp, DotsSixVertical, Info } from "@phosphor-icons/react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip";
 import { TableHead, TableHeader, TableRow } from "@/shadcn/ui/table";
-import { AppTableColumn, AppTableSortDirection } from "./AppTable.types";
+import type { AppTableColumn, AppTableSortDirection } from "./AppTable.types";
 import { AppTableColumnMenu } from "./AppTableColumnMenu";
 import { cn } from "@/lib/utils";
 import {
@@ -61,15 +61,21 @@ function SortableHeaderCell<TRow>({
     }
   };
 
-  const SortIcon = () => {
-    if (!isSortable) return null;
-    if (!isActive) return <ArrowsDownUp className={SORT_ICON_INACTIVE_CLASS} />;
-    return sortOrder === "asc" ? (
-      <CaretUp className={SORT_ICON_ACTIVE_CLASS} />
-    ) : (
-      <CaretDown className={SORT_ICON_ACTIVE_CLASS} />
-    );
-  };
+  // DEV_NOTE: a plain node, not a nested component — declaring a component inside render remounts
+  // it (and drops its state) on every parent render. See react-x/no-nested-component-definitions.
+  let sortIcon = null;
+  if (isSortable) {
+    if (!isActive) {
+      sortIcon = <ArrowsDownUp className={SORT_ICON_INACTIVE_CLASS} />;
+    } else {
+      sortIcon =
+        sortOrder === "asc" ? (
+          <CaretUp className={SORT_ICON_ACTIVE_CLASS} />
+        ) : (
+          <CaretDown className={SORT_ICON_ACTIVE_CLASS} />
+        );
+    }
+  }
 
   return (
     <AppTableColumnMenu onHide={() => onHideColumn(column.key)}>
@@ -96,7 +102,7 @@ function SortableHeaderCell<TRow>({
 
           {column.header}
 
-          <SortIcon />
+          {sortIcon}
 
           {column.headerTooltip && (
             <Tooltip>

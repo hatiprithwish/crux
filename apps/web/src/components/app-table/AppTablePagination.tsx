@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   CaretDoubleLeft,
   CaretDoubleRight,
@@ -10,7 +10,7 @@ import {
 } from "@phosphor-icons/react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { AppTablePaginationProps } from "./AppTable.types";
+import type { AppTablePaginationProps } from "./AppTable.types";
 import { PAGINATION_LABELS, PAGINATION_NAV_BTN_CLASS, computePaginationDisplay } from "./utils";
 
 // ─── Page Number Input ────────────────────────────────────────────────────────
@@ -24,10 +24,14 @@ interface PageInputProps {
 
 function PageInput({ currentPage, totalPages, onJumpToPage, isDisabled }: PageInputProps) {
   const [inputValue, setInputValue] = useState(String(currentPage));
+  // DEV_NOTE: adjust-state-during-render rather than a syncing effect — an effect here would
+  // render the stale page number once, then immediately re-render with the new one.
+  const [lastPage, setLastPage] = useState(currentPage);
 
-  useEffect(() => {
+  if (lastPage !== currentPage) {
+    setLastPage(currentPage);
     setInputValue(String(currentPage));
-  }, [currentPage]);
+  }
 
   return (
     <input

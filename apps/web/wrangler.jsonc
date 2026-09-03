@@ -4,9 +4,10 @@
   "compatibility_date": "2026-05-22",
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
-  "vars": {
-    "VITE_API_URL": "http://localhost:8787",
-  },
+  // DEV_NOTE: no "vars" here on purpose. The client reads VITE_* through `import.meta.env`, which
+  // Vite inlines at BUILD time from .env locally and from the GitHub environment secrets in CI —
+  // a Worker runtime var of the same name is never read. Change the API URL in .env / the
+  // VITE_API_URL environment secret, not here.
   "observability": {
     "logs": {
       "enabled": true,
@@ -16,10 +17,6 @@
   "env": {
     "staging": {
       "name": "crux-web-staging",
-      "vars": {
-        "VITE_API_URL": "https://crux-worker-staging.hatiprithwish.workers.dev",
-        "SENTRY_PROJECT": "crux",
-      },
       "observability": {
         "logs": {
           "enabled": true,
@@ -29,10 +26,6 @@
     },
     "production": {
       "name": "crux-web",
-      "vars": {
-        "VITE_API_URL": "https://crux-worker.hatiprithwish.workers.dev",
-        "SENTRY_PROJECT": "crux",
-      },
       "observability": {
         "logs": {
           "enabled": true,

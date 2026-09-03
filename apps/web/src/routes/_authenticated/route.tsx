@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, Link } from "@tanstack/react-router";
-import { useAuth } from "@clerk/tanstack-react-start";
+import { useAuth, UserButton } from "@clerk/tanstack-react-start";
 import { useEffect, useRef } from "react";
 import { Button } from "@/shadcn/ui/button";
 import { apiClient } from "@/providers/apiClient";
@@ -76,6 +76,9 @@ function AppNav() {
             Archived
           </Link>
         </Button>
+        <div className="ml-auto">
+          <UserButton />
+        </div>
       </div>
     </nav>
   );

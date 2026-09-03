@@ -55,6 +55,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
           publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}
           signInUrl="/auth/sign-in"
           signUpUrl="/auth/sign-up"
+          afterSignOutUrl="/auth/sign-in"
         >
           <Outlet />
         </ClerkProvider>

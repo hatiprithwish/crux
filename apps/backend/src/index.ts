@@ -2,7 +2,7 @@ import { honoLogger } from "@logtape/hono";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
-import { configureLogger, disposeLogger, withRequestContext } from "@/providers/logger";
+import AppLogger, { configureLogger, disposeLogger, withRequestContext } from "@/providers/logger";
 import AuthRoutes from "@/routes/AuthRoutes";
 import UsersRoutes from "@/routes/UserRoutes";
 import NotesRoutes from "@/routes/NotesRoutes";
@@ -53,6 +53,19 @@ app.route("/notes", NotesRoutes);
 app.route("/trackers", TrackersRoutes);
 app.route("/entities", EntitiesRoutes);
 app.route("/metrics", MetricsRoutes);
+
+// DEV_NOTE: last-resort net for exceptions thrown outside a DAL's try/catch (e.g. a third-party
+// SDK call in a route handler) — without this, Hono's default 500 has no body and the Workers
+// log carries no error message, exactly what made the clerk-sync 500 undiagnosable.
+app.onError((error, c) => {
+  AppLogger.error({
+    category: Schemas.LogCategory.Route,
+    action: Schemas.LogAction.UnhandledError,
+    message: `Unhandled error on ${c.req.method} ${c.req.path}`,
+    error,
+  });
+  return c.json({ isSuccess: false, message: "Internal server error" }, 500);
+});
 
 export default {
   fetch(req: Request, env: Env, ctx: ExecutionContext) {

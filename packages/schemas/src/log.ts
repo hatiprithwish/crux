@@ -7,6 +7,9 @@ export enum LogCategory {
 }
 
 export enum LogAction {
+  // Infra
+  UnhandledError = "UnhandledError",
+
   // Auth
   VerifyToken = "VerifyToken",
   SyncClerkUser = "SyncClerkUser",

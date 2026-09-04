@@ -45,14 +45,13 @@ export function EntityForm({
   const defaultValues: Schemas.EntityBase = initialValue ?? {
     name: "",
     kind: defaultKind,
-    emoji: "",
   };
 
   const form = useForm({
     defaultValues,
     validators: { onSubmit: Schemas.ZEntityBase },
     onSubmit: async ({ value }) => {
-      await onSubmit({ ...value, emoji: value.emoji?.trim() === "" ? null : value.emoji });
+      await onSubmit(value);
     },
   });
 
@@ -111,21 +110,6 @@ export function EntityForm({
                 mirrors it. Archive it and create the right one instead.
               </span>
             ) : null}
-          </Field>
-        )}
-      </form.Field>
-
-      <form.Field name="emoji">
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor={field.name}>Emoji (optional)</FieldLabel>
-            <Input
-              id={field.name}
-              value={field.state.value ?? ""}
-              maxLength={4}
-              onChange={(event) => field.handleChange(event.target.value)}
-              onBlur={field.handleBlur}
-            />
           </Field>
         )}
       </form.Field>

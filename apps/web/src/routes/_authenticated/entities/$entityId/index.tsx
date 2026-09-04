@@ -77,10 +77,7 @@ function EntityDetailPage() {
     <div className="mx-auto max-w-2xl p-6 flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">
-            {entity.emoji ? `${entity.emoji} ` : ""}
-            {entity.name}
-          </h1>
+          <h1 className="text-2xl font-semibold">{entity.name}</h1>
           <span className="text-sm text-muted-foreground">{entity.kind}</span>
         </div>
         <div className="flex gap-2">
@@ -105,7 +102,6 @@ function EntityDetailPage() {
               initialValue={{
                 name: entity.name,
                 kind: entity.kind,
-                emoji: entity.emoji ?? "",
                 colorIndex: entity.colorIndex,
                 parentPublicId: entity.parentPublicId,
                 status: entity.status,
@@ -119,7 +115,6 @@ function EntityDetailPage() {
                   publicId: entity.publicId,
                   entity: {
                     name: value.name,
-                    emoji: value.emoji,
                     colorIndex: value.colorIndex,
                   },
                 });

@@ -10,7 +10,6 @@ type CreateEntityParams = {
   userId: string;
   kind: Schemas.EntityKind;
   name: string;
-  emoji?: string | null;
   colorIndex?: number | null;
   parentId?: number | null;
   status?: Schemas.EntityStatus | null;
@@ -38,7 +37,6 @@ export default class EntitiesDAL {
           userId: params.userId,
           kind: params.kind,
           name: params.name,
-          emoji: params.emoji ?? null,
           colorIndex: params.colorIndex ?? null,
           parentId: params.parentId ?? null,
           status: params.status ?? null,
@@ -70,7 +68,7 @@ export default class EntitiesDAL {
   }
 
   // DEV_NOTE: partial by construction — only the fields the caller actually sent are written, so a
-  // rename can't blank an emoji the form never showed. `kind` is absent on purpose (see
+  // rename can't blank a colour the form never showed. `kind` is absent on purpose (see
   // ZUpdateEntityApiRequest): an entity's kind is load-bearing for every entry_entities role that
   // already points at it.
   async updateEntity(params: {
@@ -78,7 +76,6 @@ export default class EntitiesDAL {
     publicId: string;
     fields: {
       name?: string;
-      emoji?: string | null;
       colorIndex?: number | null;
       parentId?: number | null;
       status?: Schemas.EntityStatus | null;

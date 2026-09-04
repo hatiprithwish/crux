@@ -32,7 +32,6 @@ import { CONTROL_LABELS, getTodayLocalDate } from "./-utils";
 const ZTrackerFormValues = z
   .object({
     name: z.string().min(1, "Name is required"),
-    emoji: z.string().nullable().optional(),
     control: Schemas.ZControl,
     entryMode: z.enum(["live", "retro"]),
     scheduleType: z.enum(["daily", "days_of_week", "times_per_week"]),
@@ -205,7 +204,6 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
 
   const defaultValues: TrackerFormValues = {
     name: "",
-    emoji: "",
     control: "toggle",
     entryMode: "retro",
     scheduleType: "daily",
@@ -255,7 +253,6 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
       await onSubmit({
         tracker: {
           name: value.name,
-          emoji: value.emoji?.trim() === "" ? null : value.emoji,
           manifest: {
             control: value.control,
             // DEV_NOTE: the primary metric's key is added server-side — the Repo owns that
@@ -469,21 +466,6 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
 
       {advancedOpen ? (
         <div className="flex flex-col gap-4 rounded-md border p-4">
-          <form.Field name="emoji">
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor={field.name}>Emoji (optional)</FieldLabel>
-                <Input
-                  id={field.name}
-                  value={field.state.value ?? ""}
-                  maxLength={4}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  onBlur={field.handleBlur}
-                />
-              </Field>
-            )}
-          </form.Field>
-
           <form.Field name="control">
             {(field) => (
               <Field>

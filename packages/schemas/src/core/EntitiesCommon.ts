@@ -9,7 +9,6 @@ import { ZEntityKind, ZEntityStatus } from "./DomainEnums";
 export const ZEntityBase = z.object({
   name: z.string(),
   kind: ZEntityKind,
-  emoji: z.string().nullable().optional(),
   colorIndex: z.number().nullable().optional(),
   parentPublicId: z.string().nullable().optional(),
   status: ZEntityStatus.nullable().optional(),
@@ -28,7 +27,6 @@ export const ZEntity = z.object({
   userId: z.string(),
   kind: ZEntityKind,
   name: z.string(),
-  emoji: z.string().nullable(),
   colorIndex: z.number().nullable(),
   parentId: z.number().nullable(),
   status: ZEntityStatus.nullable(),

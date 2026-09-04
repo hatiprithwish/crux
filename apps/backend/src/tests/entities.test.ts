@@ -99,17 +99,17 @@ describe("Editing an entity", () => {
   });
 
   it("renames without touching the fields it wasn't given", async () => {
-    const withEmoji = await patch(entityPublicId, { emoji: "💳" });
-    expect(withEmoji.status).toBe(200);
+    const withColor = await patch(entityPublicId, { colorIndex: 3 });
+    expect(withColor.status).toBe(200);
 
     const renamed = await patch(entityPublicId, { name: `Renamed ${runSuffix}` });
     await waitOnExecutionContext(ctx);
     expect(renamed.status).toBe(200);
 
-    const body = (await renamed.json()) as { entity: { name: string; emoji: string | null } };
+    const body = (await renamed.json()) as { entity: { name: string; colorIndex: number | null } };
     expect(body.entity.name).toBe(`Renamed ${runSuffix}`);
-    // The rename didn't send emoji — a partial update must not blank what it never saw.
-    expect(body.entity.emoji).toBe("💳");
+    // The rename didn't send colorIndex — a partial update must not blank what it never saw.
+    expect(body.entity.colorIndex).toBe(3);
   });
 
   it("keeps the change after a reload, and never leaks the internal id", async () => {

@@ -83,7 +83,6 @@ function EntitiesPage() {
                     params={{ entityId: entity.publicId }}
                     className="hover:underline"
                   >
-                    {entity.emoji ? `${entity.emoji} ` : ""}
                     {entity.name}
                   </Link>
                   <div className="flex gap-2">

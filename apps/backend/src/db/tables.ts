@@ -93,7 +93,6 @@ export const entities = table(
     userId: t.text("user_id").notNull(),
     kind: t.text().$type<Schemas.EntityKind>().notNull(),
     name: t.text().notNull(),
-    emoji: t.text(),
     colorIndex: t.integer("color_index"), // index into the --chart-N categorical scale
     parentId: t.integer("parent_id"),
     status: t.text().$type<Schemas.EntityStatus>(),
@@ -142,7 +141,6 @@ export const trackers = table(
     publicId: t.text("public_id").notNull(),
     userId: t.text("user_id").notNull(),
     name: t.text().notNull(),
-    emoji: t.text(),
     colorIndex: t.integer("color_index"),
     primaryMetricId: t.integer("primary_metric_id").notNull(),
     manifestJson: t

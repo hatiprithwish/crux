@@ -57,7 +57,6 @@ export default class EntitiesRepo {
       userId: params.userId,
       kind: params.entity.kind,
       name: params.entity.name,
-      emoji: params.entity.emoji,
       colorIndex: params.entity.colorIndex,
       parentId,
       status: params.entity.status,
@@ -91,7 +90,6 @@ export default class EntitiesRepo {
 
     const fields: Parameters<EntitiesDAL["updateEntity"]>[0]["fields"] = {};
     if (params.entity.name !== undefined) fields.name = params.entity.name;
-    if (params.entity.emoji !== undefined) fields.emoji = params.entity.emoji;
     if (params.entity.colorIndex !== undefined) fields.colorIndex = params.entity.colorIndex;
     if (params.entity.status !== undefined) fields.status = params.entity.status;
     if (params.entity.startedOn !== undefined) fields.startedOn = params.entity.startedOn;

@@ -73,10 +73,7 @@ function ArchivedPage() {
               {trackers.map((tracker) => (
                 <div key={tracker.publicId} className="flex items-center justify-between gap-4">
                   <div className="flex flex-col">
-                    <span>
-                      {tracker.emoji ? `${tracker.emoji} ` : ""}
-                      {tracker.name}
-                    </span>
+                    <span>{tracker.name}</span>
                     <span className="text-xs text-muted-foreground">
                       {tracker.manifest.control} · {describeSchedule(tracker.manifest.schedule)}
                       {tracker.archivedAt
@@ -125,10 +122,7 @@ function ArchivedPage() {
               {entities.map((entity) => (
                 <div key={entity.publicId} className="flex items-center justify-between gap-4">
                   <div className="flex flex-col">
-                    <span>
-                      {entity.emoji ? `${entity.emoji} ` : ""}
-                      {entity.name}
-                    </span>
+                    <span>{entity.name}</span>
                     <span className="text-xs text-muted-foreground">
                       {entity.kind}
                       {entity.archivedAt

@@ -57,10 +57,7 @@ function TrackerDetailPage() {
     <div className="mx-auto max-w-2xl p-6 flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">
-            {tracker.emoji ? `${tracker.emoji} ` : ""}
-            {tracker.name}
-          </h1>
+          <h1 className="text-2xl font-semibold">{tracker.name}</h1>
           <span className="text-sm text-muted-foreground">
             {tracker.manifest.control} · {describeSchedule(tracker.manifest.schedule)}
             {tracker.manifest.target !== null ? ` · target ${tracker.manifest.target}` : ""}

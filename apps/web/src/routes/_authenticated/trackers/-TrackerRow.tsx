@@ -57,7 +57,6 @@ export default function TrackerRow({ today }: TrackerRowProps) {
               params={{ trackerId: tracker.publicId }}
               className="hover:underline"
             >
-              {tracker.emoji ? `${tracker.emoji} ` : ""}
               {tracker.name}
             </Link>
           </CardTitle>

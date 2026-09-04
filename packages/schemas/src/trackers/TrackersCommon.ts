@@ -31,7 +31,6 @@ export type TrackerManifest = z.infer<typeof ZTrackerManifest>;
 // Create Tracker Body
 export const ZTrackerBase = z.object({
   name: z.string(),
-  emoji: z.string().nullable().optional(),
   colorIndex: z.number().nullable().optional(),
   manifest: ZTrackerManifest,
   sortOrder: z.number().optional(),

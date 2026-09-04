@@ -32,7 +32,6 @@ function makeTracker(
     publicId: "trk_test123",
     userId: "user_test123",
     name: "Test Tracker",
-    emoji: null,
     colorIndex: null,
     manifest: {
       control,

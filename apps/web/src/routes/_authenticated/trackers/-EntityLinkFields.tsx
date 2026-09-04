@@ -112,7 +112,6 @@ export function EntityLinkFields({ value, onChange, roles, alwaysOpen }: EntityL
                     .filter((entity) => !entity.archivedAt)
                     .map((entity) => (
                       <SelectItem key={entity.publicId} value={entity.publicId}>
-                        {entity.emoji ? `${entity.emoji} ` : ""}
                         {entity.name}
                       </SelectItem>
                     ))}

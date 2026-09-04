@@ -87,7 +87,7 @@ function incrementManifest(step: number) {
 async function createTracker(name: string, manifest: unknown, metric: unknown): Promise<string> {
   const res = await worker.fetch(
     makeRequest("/trackers", "POST", {
-      tracker: { name, manifest, activeFrom: today, emoji: null },
+      tracker: { name, manifest, activeFrom: today },
       metric,
     }),
     testEnv,

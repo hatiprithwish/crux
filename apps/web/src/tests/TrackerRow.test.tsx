@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import TrackerRow from "@/routes/_authenticated/trackers/-TrackerRow";
 import type * as Schemas from "@app/schemas";
@@ -136,8 +137,10 @@ describe("TrackerRow", () => {
     expect(screen.getByText(/deep work/i)).toBeInTheDocument();
   });
 
-  it("renders the archive button", () => {
+  it("renders the archive option in the overflow menu", async () => {
+    const user = userEvent.setup();
     render(<TrackerRow today={makeToday(makeTracker("toggle"))} />);
-    expect(screen.getByRole("button", { name: /archive/i })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /tracker options/i }));
+    expect(await screen.findByRole("menuitem", { name: /archive/i })).toBeInTheDocument();
   });
 });

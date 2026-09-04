@@ -1,6 +1,13 @@
 import { Link } from "@tanstack/react-router";
+import { DotsThree, Archive } from "@phosphor-icons/react";
 import { Button } from "@/shadcn/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shadcn/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shadcn/ui/dropdown-menu";
 import type * as Schemas from "@app/schemas";
 import { useArchiveTracker, useQuickAdd } from "./-data";
 import { ToggleControl } from "./-ToggleControl";
@@ -43,9 +50,8 @@ export default function TrackerRow({ today }: TrackerRowProps) {
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <CardTitle>
-            {/* DEV_NOTE: underlined on hover because it is a link — an unstyled title gives the
-                reader nothing to tell them the history screen exists. The History button beside it
-                is the discoverable path; this is the shortcut. */}
+            {/* DEV_NOTE: underlined on hover because it is a link to the history screen — the
+                only path there now that the row no longer duplicates it as a button. */}
             <Link
               to="/trackers/$trackerId"
               params={{ trackerId: tracker.publicId }}
@@ -60,21 +66,23 @@ export default function TrackerRow({ today }: TrackerRowProps) {
             {today.streak > 0 ? ` · ${today.streak} day streak` : ""}
           </span>
         </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link to="/trackers/$trackerId" params={{ trackerId: tracker.publicId }}>
-              History
-            </Link>
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            disabled={archiveTracker.isPending}
-            onClick={() => archiveTracker.mutate(tracker.publicId)}
-          >
-            Archive
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon-sm" aria-label="Tracker options">
+              <DotsThree className="size-4" weight="bold" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={archiveTracker.isPending}
+              onSelect={() => archiveTracker.mutate(tracker.publicId)}
+            >
+              <Archive className="size-4" />
+              Archive
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </CardHeader>
       <CardContent>{renderControl(tracker.manifest.control, controlProps)}</CardContent>
     </Card>

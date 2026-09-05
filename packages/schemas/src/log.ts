@@ -39,6 +39,9 @@ export enum LogAction {
   CreateMetric = "CreateMetric",
   GetMetricDetails = "GetMetricDetails",
   GetMetrics = "GetMetrics",
+  GetMetricsUsage = "GetMetricsUsage",
+  UpdateMetric = "UpdateMetric",
+  DeleteMetric = "DeleteMetric",
 
   // Substrate — trackers
   CreateTracker = "CreateTracker",

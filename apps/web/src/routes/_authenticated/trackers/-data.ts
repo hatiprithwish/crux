@@ -236,16 +236,6 @@ export function useUnarchiveAllTrackers() {
   });
 }
 
-export class MetricsQueries {
-  static readonly keys = {
-    all: () => ["metrics"] as const,
-  };
-
-  static list(getToken: () => Promise<string | null>) {
-    return queryOptions({
-      queryKey: MetricsQueries.keys.all(),
-      queryFn: ({ signal }) =>
-        apiClient<Schemas.GetMetricsApiResponse>("/metrics", getToken, { signal }),
-    });
-  }
-}
+// DEV_NOTE: MetricsQueries used to live here. It moved to metrics/-data.ts when metrics got a screen
+// of their own — a metric is a user-global resource (architecture.md §5), not a detail of the
+// tracker that happened to declare it.

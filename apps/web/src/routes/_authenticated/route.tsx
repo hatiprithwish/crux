@@ -67,6 +67,15 @@ function AppNav() {
           </Link>
         </Button>
         <Button asChild variant="ghost" size="sm">
+          <Link
+            to="/metrics"
+            activeProps={{ className: "bg-accent text-accent-foreground" }}
+            activeOptions={{ exact: false }}
+          >
+            Metrics
+          </Link>
+        </Button>
+        <Button asChild variant="ghost" size="sm">
           <Link to="/notes" activeProps={{ className: "bg-accent text-accent-foreground" }}>
             Notes
           </Link>

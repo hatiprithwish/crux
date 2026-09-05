@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useAuth } from "@clerk/tanstack-react-start";
 import { z } from "zod";
 import { Button } from "@/shadcn/ui/button";
@@ -11,11 +12,12 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/shadcn/ui/select";
 import * as Schemas from "@app/schemas";
-import { MetricsQueries } from "./-data";
+import { MetricsQueries } from "../metrics/-data";
 import { CONTROL_LABELS, getTodayLocalDate } from "./-utils";
 
 // DEV_NOTE: this form *is* the manifest engine's front door — everything Phase 0–3 hardcoded per
@@ -27,8 +29,14 @@ import { CONTROL_LABELS, getTodayLocalDate } from "./-utils";
 // old expense form, which typed amounts in major units and converted to minor.
 //
 // DEV_NOTE: templates below are a presentation layer only — they pick starting values for the same
-// manifest/metric fields the Advanced section edits directly. No new field exists because of a
-// template; a template is just a shortcut into the fields that were already here.
+// manifest fields the Advanced section edits directly. No new field exists because of a template; a
+// template is just a shortcut into the fields that were already here.
+//
+// DEV_NOTE: this form no longer declares metrics. A metric is user-global and permanent
+// (architecture.md §5) — minting one as a side effect of creating a tracker meant every tracker got
+// its own, which is precisely what stops two trackers rolling into one number. It picks an existing
+// metric now; /metrics is where they're defined. ZTrackerMetricSpec keeps its "new" branch for API
+// callers, but nothing in the UI reaches it.
 const ZTrackerFormValues = z
   .object({
     name: z.string().min(1, "Name is required"),
@@ -41,22 +49,9 @@ const ZTrackerFormValues = z
     step: z.string(),
     compute: z.string(),
     activeFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    metricMode: z.enum(["new", "existing"]),
-    metricPublicId: z.string(),
-    metricName: z.string(),
-    metricKey: z.string(),
-    semanticType: Schemas.ZSemanticType,
-    canonicalUnit: z.string(),
-    defaultAgg: Schemas.ZDefaultAgg,
-    direction: Schemas.ZDirection,
+    metricPublicId: z.string().min(1, "Choose a metric"),
   })
   .superRefine((values, ctx) => {
-    if (values.metricMode === "existing" && values.metricPublicId === "") {
-      ctx.addIssue({ code: "custom", path: ["metricPublicId"], message: "Choose a metric" });
-    }
-    if (values.metricMode === "new" && values.canonicalUnit.trim() === "") {
-      ctx.addIssue({ code: "custom", path: ["canonicalUnit"], message: "Unit is required" });
-    }
     if (values.scheduleType === "days_of_week" && values.scheduleDays.length === 0) {
       ctx.addIssue({ code: "custom", path: ["scheduleDays"], message: "Pick at least one day" });
     }
@@ -72,22 +67,17 @@ interface Template {
   description: string;
   icon: string;
   control: Schemas.Control;
-  semanticType: Schemas.SemanticType;
-  canonicalUnit: string;
-  defaultAgg: Schemas.DefaultAgg;
-  direction: Schemas.Direction;
-  showUnit: boolean;
-  unitLabel: string;
-  unitPlaceholder: string;
+  // DEV_NOTE: no longer used to *build* a metric — it groups the metric picker instead, so choosing
+  // "Time something" floats the duration metrics to the top without hiding the rest. A template
+  // that guessed wrong used to mint a bad metric; now the worst it does is sort a list.
+  suggestedSemanticTypes: Schemas.SemanticType[];
   showTarget: boolean;
   targetLabel: string;
 }
 
 // DEV_NOTE: one preset per manifest.control shape a user is likely to reach for by intent rather
-// than by mechanism — "measure" defaults to semanticType "count" rather than picking among
-// mass_grams/volume_ml/distance_m, since the right one differs per instance (weight vs water vs
-// distance) and forcing a sub-choice here would just re-add the field this screen exists to hide.
-// Advanced still edits the real semanticType for whoever needs it correct.
+// than by mechanism — "measure" suggests several semantic types rather than picking one, since the
+// right one differs per instance (weight vs water vs distance).
 const TEMPLATES: Template[] = [
   {
     key: "did_it",
@@ -95,13 +85,7 @@ const TEMPLATES: Template[] = [
     description: "Meditate, take a bath",
     icon: "✓",
     control: "toggle",
-    semanticType: "boolean",
-    canonicalUnit: "boolean",
-    defaultAgg: "sum",
-    direction: "higher_better",
-    showUnit: false,
-    unitLabel: "Unit",
-    unitPlaceholder: "",
+    suggestedSemanticTypes: ["boolean"],
     showTarget: false,
     targetLabel: "Daily goal",
   },
@@ -111,13 +95,7 @@ const TEMPLATES: Template[] = [
     description: "Pushups, pages, glasses",
     icon: "#",
     control: "increment",
-    semanticType: "count",
-    canonicalUnit: "",
-    defaultAgg: "sum",
-    direction: "higher_better",
-    showUnit: true,
-    unitLabel: "Unit",
-    unitPlaceholder: "reps",
+    suggestedSemanticTypes: ["count"],
     showTarget: true,
     targetLabel: "Daily goal",
   },
@@ -127,13 +105,7 @@ const TEMPLATES: Template[] = [
     description: "Deep work, running",
     icon: "⏱",
     control: "timer",
-    semanticType: "duration_seconds",
-    canonicalUnit: "seconds",
-    defaultAgg: "sum",
-    direction: "higher_better",
-    showUnit: false,
-    unitLabel: "Unit",
-    unitPlaceholder: "",
+    suggestedSemanticTypes: ["duration_seconds"],
     showTarget: false,
     targetLabel: "Daily goal",
   },
@@ -143,13 +115,7 @@ const TEMPLATES: Template[] = [
     description: "Weight, water, distance",
     icon: "⚖",
     control: "daily_total",
-    semanticType: "count",
-    canonicalUnit: "",
-    defaultAgg: "last",
-    direction: "neutral",
-    showUnit: true,
-    unitLabel: "Unit",
-    unitPlaceholder: "kg",
+    suggestedSemanticTypes: ["mass_grams", "volume_ml", "distance_m", "energy_kcal", "count"],
     showTarget: true,
     targetLabel: "Target",
   },
@@ -159,13 +125,7 @@ const TEMPLATES: Template[] = [
     description: "Spending, income",
     icon: "₹",
     control: "amount_pad",
-    semanticType: "currency_minor",
-    canonicalUnit: "",
-    defaultAgg: "sum",
-    direction: "lower_better",
-    showUnit: true,
-    unitLabel: "Currency",
-    unitPlaceholder: "INR",
+    suggestedSemanticTypes: ["currency_minor"],
     showTarget: true,
     targetLabel: "Daily budget",
   },
@@ -175,13 +135,7 @@ const TEMPLATES: Template[] = [
     description: "Screen time, unlocks",
     icon: "↘",
     control: "increment",
-    semanticType: "count",
-    canonicalUnit: "",
-    defaultAgg: "sum",
-    direction: "lower_better",
-    showUnit: true,
-    unitLabel: "Unit",
-    unitPlaceholder: "times",
+    suggestedSemanticTypes: ["count", "duration_seconds"],
     showTarget: true,
     targetLabel: "Daily limit",
   },
@@ -202,6 +156,13 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const activeTemplate = TEMPLATES.find((template) => template.key === templateKey) ?? null;
 
+  // DEV_NOTE: grouping, not filtering — a template is a guess about intent, and a metric it didn't
+  // anticipate is still a legitimate choice. With no template picked everything lands in "Others",
+  // which renders as one ungrouped list.
+  const suggested = activeTemplate?.suggestedSemanticTypes ?? [];
+  const suggestedMetrics = metrics.filter((metric) => suggested.includes(metric.semanticType));
+  const otherMetrics = metrics.filter((metric) => !suggested.includes(metric.semanticType));
+
   const defaultValues: TrackerFormValues = {
     name: "",
     control: "toggle",
@@ -213,14 +174,7 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
     step: "",
     compute: NO_COMPUTE,
     activeFrom: getTodayLocalDate(),
-    metricMode: "new",
     metricPublicId: "",
-    metricName: "",
-    metricKey: "",
-    semanticType: "boolean",
-    canonicalUnit: "boolean",
-    defaultAgg: "sum",
-    direction: "higher_better",
   };
 
   const form = useForm({
@@ -234,21 +188,10 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
             ? { type: "days_of_week", days: value.scheduleDays }
             : { type: "times_per_week", count: value.scheduleCount };
 
-      const metric: Schemas.TrackerMetricSpec =
-        value.metricMode === "existing"
-          ? { mode: "existing", metricPublicId: value.metricPublicId }
-          : {
-              mode: "new",
-              metric: {
-                key: value.metricKey.trim() === "" ? undefined : value.metricKey.trim(),
-                name: value.metricName.trim() === "" ? value.name : value.metricName,
-                semanticType: value.semanticType,
-                canonicalUnit: value.canonicalUnit,
-                defaultAgg: value.defaultAgg,
-                direction: value.direction,
-                dateAttribution: "start",
-              },
-            };
+      const metric: Schemas.TrackerMetricSpec = {
+        mode: "existing",
+        metricPublicId: value.metricPublicId,
+      };
 
       await onSubmit({
         tracker: {
@@ -274,10 +217,6 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
   function applyTemplate(template: Template) {
     setTemplateKey(template.key);
     form.setFieldValue("control", template.control);
-    form.setFieldValue("semanticType", template.semanticType);
-    form.setFieldValue("canonicalUnit", template.canonicalUnit);
-    form.setFieldValue("defaultAgg", template.defaultAgg);
-    form.setFieldValue("direction", template.direction);
   }
 
   return (
@@ -328,31 +267,61 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
         }}
       </form.Field>
 
-      <form.Subscribe selector={(state) => state.values.metricMode}>
-        {(metricMode) =>
-          activeTemplate?.showUnit && metricMode === "new" ? (
-            <form.Field name="canonicalUnit">
-              {(field) => {
-                const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
-                return (
-                  <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor={field.name}>{activeTemplate.unitLabel}</FieldLabel>
-                    <Input
-                      id={field.name}
-                      value={field.state.value}
-                      placeholder={activeTemplate.unitPlaceholder}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                      onBlur={field.handleBlur}
-                      aria-invalid={isInvalid}
-                    />
-                    <FieldError errors={field.state.meta.errors} />
-                  </Field>
-                );
-              }}
-            </form.Field>
-          ) : null
-        }
-      </form.Subscribe>
+      {/* DEV_NOTE: promoted out of Advanced and made required. Picking the metric is the choice that
+          decides whether this tracker rolls up with anything else, so it belongs on the main path
+          rather than behind a disclosure most people never open. */}
+      <form.Field name="metricPublicId">
+        {(field) => {
+          const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+          return (
+            <Field data-invalid={isInvalid}>
+              <FieldLabel htmlFor={field.name}>What it measures</FieldLabel>
+              {metricsQuery.isPending ? (
+                <p className="text-sm text-muted-foreground">Loading metrics...</p>
+              ) : metricsQuery.isError ? (
+                <p className="text-sm text-destructive">Failed to load metrics.</p>
+              ) : metrics.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No metrics yet. Trackers measure a metric, so{" "}
+                  <Link to="/metrics" className="underline">
+                    define one first
+                  </Link>
+                  .
+                </p>
+              ) : (
+                <Select value={field.state.value} onValueChange={field.handleChange}>
+                  <SelectTrigger id={field.name} aria-invalid={isInvalid} className="w-full">
+                    <SelectValue placeholder="Choose a metric" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suggestedMetrics.length > 0 ? (
+                      <SelectGroup>
+                        <SelectLabel>Suggested</SelectLabel>
+                        {suggestedMetrics.map((metric) => (
+                          <SelectItem key={metric.publicId} value={metric.publicId}>
+                            {metric.name} · {metric.canonicalUnit}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ) : null}
+                    {otherMetrics.length > 0 ? (
+                      <SelectGroup>
+                        {suggestedMetrics.length > 0 ? <SelectLabel>Others</SelectLabel> : null}
+                        {otherMetrics.map((metric) => (
+                          <SelectItem key={metric.publicId} value={metric.publicId}>
+                            {metric.name} · {metric.canonicalUnit}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ) : null}
+                  </SelectContent>
+                </Select>
+              )}
+              <FieldError errors={field.state.meta.errors} />
+            </Field>
+          );
+        }}
+      </form.Field>
 
       {activeTemplate?.showTarget ? (
         <form.Field name="target">
@@ -566,208 +535,6 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
               </Field>
             )}
           </form.Field>
-
-          <form.Field name="metricMode">
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor={field.name}>Metric</FieldLabel>
-                <Select
-                  value={field.state.value}
-                  onValueChange={(value) => field.handleChange(value as "new" | "existing")}
-                >
-                  <SelectTrigger id={field.name} className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="new">Declare a new metric</SelectItem>
-                      <SelectItem value="existing">Reuse an existing metric</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-            )}
-          </form.Field>
-
-          <form.Subscribe selector={(state) => state.values.metricMode}>
-            {(metricMode) =>
-              metricMode === "existing" ? (
-                <form.Field name="metricPublicId">
-                  {(field) => {
-                    const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
-                    return (
-                      <Field data-invalid={isInvalid}>
-                        <FieldLabel htmlFor={field.name}>Existing metric</FieldLabel>
-                        {metricsQuery.isPending ? (
-                          <p className="text-sm text-muted-foreground">Loading metrics...</p>
-                        ) : metricsQuery.isError ? (
-                          <p className="text-sm text-destructive">Failed to load metrics.</p>
-                        ) : metrics.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">
-                            No metrics yet — declare a new one instead.
-                          </p>
-                        ) : (
-                          <Select value={field.state.value} onValueChange={field.handleChange}>
-                            <SelectTrigger
-                              id={field.name}
-                              aria-invalid={isInvalid}
-                              className="w-full"
-                            >
-                              <SelectValue placeholder="Choose a metric" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectGroup>
-                                {metrics.map((metric) => (
-                                  <SelectItem key={metric.publicId} value={metric.publicId}>
-                                    {metric.name} ({metric.key})
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                        )}
-                        <FieldError errors={field.state.meta.errors} />
-                      </Field>
-                    );
-                  }}
-                </form.Field>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  <form.Field name="metricName">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor={field.name}>Metric name (optional)</FieldLabel>
-                        <Input
-                          id={field.name}
-                          value={field.state.value}
-                          placeholder="Same as tracker name if left blank"
-                          onChange={(event) => field.handleChange(event.target.value)}
-                          onBlur={field.handleBlur}
-                        />
-                      </Field>
-                    )}
-                  </form.Field>
-
-                  <form.Field name="metricKey">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor={field.name}>Metric key (optional)</FieldLabel>
-                        <Input
-                          id={field.name}
-                          value={field.state.value}
-                          placeholder="Generated if left blank"
-                          onChange={(event) => field.handleChange(event.target.value)}
-                          onBlur={field.handleBlur}
-                        />
-                      </Field>
-                    )}
-                  </form.Field>
-
-                  <form.Field name="semanticType">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor={field.name}>Semantic type</FieldLabel>
-                        <Select
-                          value={field.state.value}
-                          onValueChange={(value) =>
-                            field.handleChange(value as Schemas.SemanticType)
-                          }
-                        >
-                          <SelectTrigger id={field.name} className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              {Schemas.ZSemanticType.options.map((option) => (
-                                <SelectItem key={option} value={option}>
-                                  {option}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                    )}
-                  </form.Field>
-
-                  <form.Field name="canonicalUnit">
-                    {(field) => {
-                      const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
-                      return (
-                        <Field data-invalid={isInvalid}>
-                          <FieldLabel htmlFor={field.name}>Canonical unit</FieldLabel>
-                          <Input
-                            id={field.name}
-                            value={field.state.value}
-                            onChange={(event) => field.handleChange(event.target.value)}
-                            onBlur={field.handleBlur}
-                            aria-invalid={isInvalid}
-                          />
-                          <FieldError errors={field.state.meta.errors} />
-                        </Field>
-                      );
-                    }}
-                  </form.Field>
-
-                  <div className="flex gap-4">
-                    <form.Field name="defaultAgg">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor={field.name}>Aggregation</FieldLabel>
-                          <Select
-                            value={field.state.value}
-                            onValueChange={(value) =>
-                              field.handleChange(value as Schemas.DefaultAgg)
-                            }
-                          >
-                            <SelectTrigger id={field.name} className="w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectGroup>
-                                {Schemas.ZDefaultAgg.options.map((option) => (
-                                  <SelectItem key={option} value={option}>
-                                    {option}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                        </Field>
-                      )}
-                    </form.Field>
-
-                    <form.Field name="direction">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor={field.name}>Direction</FieldLabel>
-                          <Select
-                            value={field.state.value}
-                            onValueChange={(value) =>
-                              field.handleChange(value as Schemas.Direction)
-                            }
-                          >
-                            <SelectTrigger id={field.name} className="w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectGroup>
-                                {Schemas.ZDirection.options.map((option) => (
-                                  <SelectItem key={option} value={option}>
-                                    {option}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                        </Field>
-                      )}
-                    </form.Field>
-                  </div>
-                </div>
-              )
-            }
-          </form.Subscribe>
         </div>
       ) : null}
 
@@ -784,7 +551,9 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
         </Button>
         <form.Subscribe selector={(state) => state.isSubmitting}>
           {(isSubmitting) => (
-            <Button type="submit" disabled={isSubmitting}>
+            // DEV_NOTE: a tracker can't be created without a metric to point at, so with none
+            // defined the button is disabled rather than left to fail validation on click.
+            <Button type="submit" disabled={isSubmitting || metrics.length === 0}>
               {isSubmitting ? "Saving..." : submitLabel}
             </Button>
           )}

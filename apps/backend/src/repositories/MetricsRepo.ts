@@ -70,7 +70,8 @@ export default class MetricsRepo {
     const fields: Schemas.UpdateMetricDALRequest["fields"] = {};
     if (params.metric.name !== undefined) fields.name = params.metric.name;
     if (params.metric.defaultAgg !== undefined) fields.defaultAgg = params.metric.defaultAgg;
-    if (params.metric.direction !== undefined) fields.direction = params.metric.direction;
+    if (params.metric.defaultDirection !== undefined)
+      fields.defaultDirection = params.metric.defaultDirection;
 
     const result = await this.metricsDal.updateMetric({
       userId: params.userId,

@@ -101,9 +101,12 @@ export const CONTROL_TILES: ControlTile[] = [
 // DEV_NOTE: units match what the backend already stores for each shape — see the domain tests
 // (money.test.ts "currency_minor", time.test.ts "seconds", trackers.test.ts "boolean" / "count").
 // Canonical units are stored, never display units (invariant 2).
+// DEV_NOTE: `direction` is not derived here any more — it moved onto the tracker's manifest, and
+// the form asks for it directly next to the target it is scored against (see DIRECTION_HINT).
+// What's left is the shape of the *quantity*, which really is the control's consequence.
 export type DerivedMetricShape = Pick<
   Schemas.MetricBase,
-  "semanticType" | "canonicalUnit" | "defaultAgg" | "direction" | "dateAttribution"
+  "semanticType" | "canonicalUnit" | "defaultAgg" | "dateAttribution"
 >;
 
 export function deriveMetricShape(control: Schemas.Control): DerivedMetricShape {
@@ -111,35 +114,45 @@ export function deriveMetricShape(control: Schemas.Control): DerivedMetricShape 
 
   switch (control) {
     case "toggle":
-      return {
-        ...base,
-        semanticType: "boolean",
-        canonicalUnit: "boolean",
-        direction: "higher_better",
-      };
+      return { ...base, semanticType: "boolean", canonicalUnit: "boolean" };
     case "timer":
-      return {
-        ...base,
-        semanticType: "duration_seconds",
-        canonicalUnit: "seconds",
-        direction: "higher_better",
-      };
+      return { ...base, semanticType: "duration_seconds", canonicalUnit: "seconds" };
     case "amount_pad":
-      // DEV_NOTE: lower_better because the overwhelming majority of amount trackers are spending.
-      // Income flips it — which is exactly the kind of case the Change panel exists for.
-      return {
-        ...base,
-        semanticType: "currency_minor",
-        canonicalUnit: "currency_minor",
-        direction: "lower_better",
-      };
+      return { ...base, semanticType: "currency_minor", canonicalUnit: "currency_minor" };
     case "increment":
     case "stepper":
     case "daily_total":
     case "form":
-      return { ...base, semanticType: "count", canonicalUnit: "count", direction: "higher_better" };
+      return { ...base, semanticType: "count", canonicalUnit: "count" };
   }
 }
+
+// DEV_NOTE: a control implies which way a tracker usually points, but only as a starting value the
+// user can overrule — an amount pad is spending far more often than income, and a timer is time
+// spent on something wanted far more often than time to be capped. Separate from
+// deriveMetricShape because this seeds a *manifest* field, not a metric one.
+export function deriveDirection(control: Schemas.Control): Schemas.Direction {
+  return control === "amount_pad" ? "lower_better" : "higher_better";
+}
+
+// DEV_NOTE: five of the eleven semantic types name their own unit, and asking for it twice is how
+// the form ended up able to store `duration_seconds` measured in "count". A type in this map locks
+// the unit field; everything else still needs the answer, because `count` of what (reps, pages,
+// cups) and which currency are real questions the type can't answer.
+export const UNIT_FOR_SEMANTIC_TYPE: Partial<Record<Schemas.SemanticType, string>> = {
+  duration_seconds: "seconds",
+  mass_grams: "grams",
+  volume_ml: "ml",
+  energy_kcal: "kcal",
+  distance_m: "metres",
+  rating_1_5: "rating",
+  boolean: "boolean",
+};
+
+export const UNIT_PLACEHOLDER: Partial<Record<Schemas.SemanticType, string>> = {
+  count: "reps",
+  currency_minor: "INR",
+};
 
 // DEV_NOTE: metrics are unique per (user_id, key), and TrackersRepo.createTracker reuses an existing
 // metric whose key matches rather than rejecting it. Slugging the tracker's name into the key is
@@ -168,18 +181,49 @@ export const SEMANTIC_TYPE_LABELS: Record<Schemas.SemanticType, string> = {
   json: "json",
 };
 
+// DEV_NOTE: labelled by what the target *is* rather than by the enum member's own wording — the
+// question a user is answering here is "is this number a floor or a ceiling?", and "neutral" only
+// makes sense once it's said as the third answer to that question: neither.
 export const DIRECTION_LABELS: Record<Schemas.Direction, string> = {
-  higher_better: "higher is better",
-  lower_better: "lower is better",
-  neutral: "neither direction is better",
+  higher_better: "more is better",
+  lower_better: "less is better",
+  neutral: "just tracking",
 };
+
+export const DIRECTION_HINTS: Record<Schemas.Direction, string> = {
+  higher_better: "The target is a floor. A day at or above it counts, and streaks build on it.",
+  lower_better: "The target is a ceiling. A day at or below it counts — a cap, not a goal.",
+  neutral: "No good or bad side. Days are recorded, never scored, and no streak runs.",
+};
+
+// Shown under the Info icon beside the Direction field.
+export const DIRECTION_HELP =
+  "Direction is how a day gets scored against its target — and whether a change is read as progress. " +
+  "It sits on the tracker, not the metric, because the same measure points different ways for " +
+  "different habits: minutes of meditation are worth raising, minutes of doomscrolling are worth " +
+  "cutting, and both can share one “minutes” metric so their totals still roll up together.";
 
 export const AGG_LABELS: Record<Schemas.DefaultAgg, string> = {
   sum: "summed per day",
   avg: "averaged per day",
-  last: "last value of the day",
   max: "highest of the day",
   min: "lowest of the day",
+};
+
+// DEV_NOTE: which aggregation to pick is a question about the quantity, not about the habit, and
+// the wrong answer is silently wrong rather than an error — summing three weigh-ins reports three
+// times a body weight. Shown under the Info icon beside the field.
+export const AGG_HELP =
+  "Aggregation is what one day's number means when a day holds several readings — and it belongs to " +
+  "the metric, not this tracker, because it's a fact about the quantity. Reps add up, so pushups are " +
+  "summed. Body weight doesn't: three weigh-ins aren't three times your weight, so it's averaged. " +
+  "Every tracker writing this metric has to agree, or their numbers can't roll into one.";
+
+export const AGG_HINTS: Record<Schemas.DefaultAgg, string> = {
+  sum: "Readings add up. Right for anything countable — reps, pages, minutes, money.",
+  avg: "The day's mean. Right for a measurement you take, not accumulate — weight, mood, a rating.",
+  max: "The day's highest reading. Right for a personal best.",
+  min: "The day's lowest reading. Right for a floor you're watching — a resting heart rate.",
 };
 
 // DEV_NOTE: "Today · 4 Sep 2026" in the design — the word matters more than the date, so the label

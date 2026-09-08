@@ -67,7 +67,7 @@ describe("Weekly orphan scan (architecture.md §4.1)", () => {
         semanticType: "count",
         canonicalUnit: "count",
         defaultAgg: "sum",
-        direction: "higher_better",
+        defaultDirection: "higher_better",
         dateAttribution: "start",
       }),
     );

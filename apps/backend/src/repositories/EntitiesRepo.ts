@@ -1,6 +1,7 @@
 import EntitiesDAL from "@/data-access-layer/EntitiesDAL";
 import EntriesDAL from "@/data-access-layer/EntriesDAL";
 import MetricsDAL from "@/data-access-layer/MetricsDAL";
+import { rangeValue } from "@/manifest/Aggregation";
 import type * as Schemas from "@app/schemas";
 
 // DEV_NOTE: the generic replacement for MoneyRepo's account/category CRUD and TimeRepo's project
@@ -250,7 +251,13 @@ export default class EntitiesRepo {
         semanticType: metric.semanticType,
         canonicalUnit: metric.canonicalUnit,
         defaultAgg: metric.defaultAgg,
-        direction: metric.direction,
+        // DEV_NOTE: the metric's default, deliberately — a rollup spans every tracker that ever
+        // wrote this metric, so there is no single manifest.direction to read here.
+        direction: metric.defaultDirection,
+        // DEV_NOTE: the metric's own aggregation over the range, not a total. A body-weight metric
+        // attributed to a "Health" entity reports its mean; summing fourteen weigh-ins reported a
+        // number fourteen times too large.
+        value: rangeValue(row, metric.defaultAgg),
         sum: row.sum,
         count: row.count,
       });
@@ -282,17 +289,41 @@ export default class EntitiesRepo {
     if (metrics.length === 0) return null;
 
     const [first] = metrics;
+    // DEV_NOTE: defaultAgg joins semanticType and canonicalUnit in the uniformity test — adding a
+    // metric's total to another's average is as meaningless as adding reps to metres, and unlike
+    // that case nothing about the resulting number looks wrong.
     const uniform = metrics.every(
       (metric) =>
-        metric.semanticType === first.semanticType && metric.canonicalUnit === first.canonicalUnit,
+        metric.semanticType === first.semanticType &&
+        metric.canonicalUnit === first.canonicalUnit &&
+        metric.defaultAgg === first.defaultAgg,
     );
     if (!uniform) return null;
+
+    const sum = metrics.reduce((total, metric) => total + metric.sum, 0);
+    const count = metrics.reduce((total, metric) => total + metric.count, 0);
+
+    // DEV_NOTE: rangeValue over the combined sum/count, not a fold over the per-metric values —
+    // that's what makes the avg case a properly weighted mean across every reading rather than an
+    // average of averages. min/max fold, because the minimum of minimums is the minimum.
+    const value =
+      first.defaultAgg === "min" || first.defaultAgg === "max"
+        ? metrics.reduce<number | null>((best, metric) => {
+            if (metric.value === null) return best;
+            if (best === null) return metric.value;
+            return first.defaultAgg === "min"
+              ? Math.min(best, metric.value)
+              : Math.max(best, metric.value);
+          }, null)
+        : rangeValue({ sum, count, min: null, max: null }, first.defaultAgg);
 
     return {
       semanticType: first.semanticType,
       canonicalUnit: first.canonicalUnit,
-      sum: metrics.reduce((total, metric) => total + metric.sum, 0),
-      count: metrics.reduce((total, metric) => total + metric.count, 0),
+      defaultAgg: first.defaultAgg,
+      value,
+      sum,
+      count,
     };
   }
 

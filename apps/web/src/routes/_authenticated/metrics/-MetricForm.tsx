@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/shadcn/ui/select";
 import * as Schemas from "@app/schemas";
+import { AGG_HINTS, UNIT_FOR_SEMANTIC_TYPE, UNIT_PLACEHOLDER } from "../trackers/-utils";
 
 // DEV_NOTE: one form for both paths, with `lockImmutable` deciding which half is editable. On the
 // edit path key/semanticType/canonicalUnit/dateAttribution render disabled rather than hidden —
@@ -42,15 +43,14 @@ const SEMANTIC_TYPE_LABELS: Record<Schemas.SemanticType, string> = {
 const DEFAULT_AGG_LABELS: Record<Schemas.DefaultAgg, string> = {
   sum: "Sum",
   avg: "Average",
-  last: "Last value",
   max: "Maximum",
   min: "Minimum",
 };
 
 const DIRECTION_LABELS: Record<Schemas.Direction, string> = {
-  higher_better: "Higher is better",
-  lower_better: "Lower is better",
-  neutral: "Neutral",
+  higher_better: "More is better",
+  lower_better: "Less is better",
+  neutral: "Just tracking",
 };
 
 const DATE_ATTRIBUTION_LABELS: Record<Schemas.DateAttribution, string> = {
@@ -72,7 +72,7 @@ export function MetricForm({
     semanticType: "count",
     canonicalUnit: "",
     defaultAgg: "sum",
-    direction: "higher_better",
+    defaultDirection: "higher_better",
     dateAttribution: "start",
   };
 
@@ -151,7 +151,15 @@ export function MetricForm({
             <Select
               value={field.state.value}
               disabled={lockImmutable}
-              onValueChange={(value) => field.handleChange(value as Schemas.SemanticType)}
+              // DEV_NOTE: picking a type writes the unit it implies (UNIT_FOR_SEMANTIC_TYPE) and
+              // the unit field locks. Asking for both independently is how a `duration_seconds`
+              // metric could end up declaring its canonical unit as "count" — a pair nothing
+              // downstream can read, and one no validation caught because each half was valid.
+              onValueChange={(value) => {
+                const semanticType = value as Schemas.SemanticType;
+                field.handleChange(semanticType);
+                form.setFieldValue("canonicalUnit", UNIT_FOR_SEMANTIC_TYPE[semanticType] ?? "");
+              }}
             >
               <SelectTrigger id={field.name} className="w-full">
                 <SelectValue />
@@ -170,26 +178,36 @@ export function MetricForm({
         )}
       </form.Field>
 
-      <form.Field name="canonicalUnit">
-        {(field) => {
-          const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
-          return (
-            <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>Canonical unit</FieldLabel>
-              <Input
-                id={field.name}
-                value={field.state.value}
-                disabled={lockImmutable}
-                placeholder="reps"
-                onChange={(event) => field.handleChange(event.target.value)}
-                onBlur={field.handleBlur}
-                aria-invalid={isInvalid}
-              />
-              <FieldError errors={field.state.meta.errors} />
-            </Field>
-          );
-        }}
-      </form.Field>
+      <form.Subscribe selector={(state) => state.values.semanticType}>
+        {(semanticType) => (
+          <form.Field name="canonicalUnit">
+            {(field) => {
+              const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+              const implied = UNIT_FOR_SEMANTIC_TYPE[semanticType];
+              return (
+                <Field data-invalid={isInvalid}>
+                  <FieldLabel htmlFor={field.name}>Canonical unit</FieldLabel>
+                  <Input
+                    id={field.name}
+                    value={field.state.value}
+                    disabled={lockImmutable || implied !== undefined}
+                    placeholder={UNIT_PLACEHOLDER[semanticType]}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                    onBlur={field.handleBlur}
+                    aria-invalid={isInvalid}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {implied
+                      ? `${SEMANTIC_TYPE_LABELS[semanticType]} is always measured in ${implied}.`
+                      : "What one unit of this metric is — reps, pages, INR. Values are stored in it."}
+                  </span>
+                  <FieldError errors={field.state.meta.errors} />
+                </Field>
+              );
+            }}
+          </form.Field>
+        )}
+      </form.Subscribe>
 
       <form.Field name="defaultAgg">
         {(field) => (
@@ -212,14 +230,19 @@ export function MetricForm({
                 </SelectGroup>
               </SelectContent>
             </Select>
+            {/* DEV_NOTE: unlike direction, this one really is the metric's to own — every tracker
+                writing it has to agree or their numbers can't roll into a single figure. */}
+            <span className="text-xs text-muted-foreground">
+              {AGG_HINTS[field.state.value]} Shared by every tracker on this metric.
+            </span>
           </Field>
         )}
       </form.Field>
 
-      <form.Field name="direction">
+      <form.Field name="defaultDirection">
         {(field) => (
           <Field>
-            <FieldLabel htmlFor={field.name}>Direction</FieldLabel>
+            <FieldLabel htmlFor={field.name}>Default direction</FieldLabel>
             <Select
               value={field.state.value}
               onValueChange={(value) => field.handleChange(value as Schemas.Direction)}
@@ -237,6 +260,14 @@ export function MetricForm({
                 </SelectGroup>
               </SelectContent>
             </Select>
+            {/* DEV_NOTE: the wording carries the whole model — a tracker scores its own days by its
+                own direction, and this only seeds a new one and colours the cross-tracker rollup,
+                where there is no single tracker to ask. */}
+            <span className="text-xs text-muted-foreground">
+              What a new tracker on this metric starts with, and how it&apos;s read in a
+              cross-tracker rollup. Each tracker sets its own direction and can disagree — the same
+              minutes are worth raising for one habit and cutting for another.
+            </span>
           </Field>
         )}
       </form.Field>

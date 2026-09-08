@@ -62,6 +62,7 @@ const toggleManifest = {
   metrics: [] as string[],
   target: null,
   step: null,
+  direction: null,
   entryMode: "retro" as const,
   schedule: { type: "daily" as const },
   compute: null,
@@ -75,7 +76,7 @@ function booleanMetric(name: string) {
       semanticType: "boolean" as const,
       canonicalUnit: "boolean",
       defaultAgg: "sum" as const,
-      direction: "higher_better" as const,
+      defaultDirection: "higher_better" as const,
       dateAttribution: "start" as const,
     },
   };

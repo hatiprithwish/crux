@@ -56,18 +56,23 @@ const MONEY_MANIFEST = {
   metrics: ["money_expense_amount", "money_transfer_amount"],
   target: null,
   step: null,
+  direction: null,
   entryMode: "retro" as const,
   schedule: { type: "daily" as const },
   compute: "money.transfer.v1" as const,
 };
 
-const currencyMetric = (key: string, name: string, direction: "lower_better" | "neutral") => ({
+const currencyMetric = (
+  key: string,
+  name: string,
+  defaultDirection: "lower_better" | "neutral",
+) => ({
   key,
   name,
   semanticType: "currency_minor" as const,
   canonicalUnit: "currency_minor",
   defaultAgg: "sum" as const,
-  direction,
+  defaultDirection,
   dateAttribution: "start" as const,
 });
 

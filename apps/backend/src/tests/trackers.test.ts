@@ -67,6 +67,7 @@ function habitManifest(entryMode: "live" | "retro" = "retro") {
     metrics: [] as string[],
     target: null,
     step: null,
+    direction: null,
     entryMode,
     schedule: { type: "daily" as const },
     compute: null,
@@ -81,7 +82,7 @@ function newMetricSpec(name: string) {
       semanticType: "boolean" as const,
       canonicalUnit: "boolean",
       defaultAgg: "sum" as const,
-      direction: "higher_better" as const,
+      defaultDirection: "higher_better" as const,
       dateAttribution: "start" as const,
     },
   };
@@ -482,7 +483,7 @@ describe("Trackers — numeric controls", () => {
       semanticType: "count" as const,
       canonicalUnit: "count",
       defaultAgg: "sum" as const,
-      direction: "higher_better" as const,
+      defaultDirection: "higher_better" as const,
       dateAttribution: "start" as const,
     },
   });
@@ -496,6 +497,7 @@ describe("Trackers — numeric controls", () => {
           metrics: [],
           target: 8,
           step: 1,
+          direction: null,
           entryMode: "retro",
           schedule: { type: "daily" },
           compute: null,
@@ -514,6 +516,7 @@ describe("Trackers — numeric controls", () => {
           metrics: [],
           target: null,
           step: null,
+          direction: null,
           entryMode: "retro",
           schedule: { type: "daily" },
           compute: null,
@@ -575,6 +578,224 @@ describe("Trackers — numeric controls", () => {
     );
     const body = (await res.json()) as { entries: unknown[] };
     expect(body.entries).toHaveLength(1);
+  });
+});
+
+// DEV_NOTE: metrics.default_agg decides what one day of a quantity *is*, and every read path used
+// to ignore it and take the sum — so an averaged metric reported a total. Two weigh-ins of 20 and
+// 40 are an average of 30, not a 60 that exists nowhere. This asserts the day's number, the number
+// a quick-add answers with, and the day's score against a target, since all three read it.
+describe("Trackers — metric aggregation", () => {
+  let avgPublicId: string;
+  const avgDate = "2026-06-01";
+
+  beforeAll(async () => {
+    const tracker = await createTracker({
+      tracker: {
+        name: "Body Weight",
+        manifest: {
+          control: "stepper",
+          metrics: [],
+          // 50 sits between the average (30) and the sum (60), so the day's state says which of
+          // the two the scoring path actually read.
+          target: 50,
+          step: 1,
+          direction: "higher_better",
+          entryMode: "retro",
+          schedule: { type: "daily" },
+          compute: null,
+        },
+        activeFrom: "2026-01-01",
+      },
+      metric: {
+        mode: "new" as const,
+        metric: {
+          key: `agg_avg_${Date.now()}`,
+          name: "Body Weight",
+          semanticType: "mass_grams" as const,
+          canonicalUnit: "grams",
+          defaultAgg: "avg" as const,
+          defaultDirection: "higher_better" as const,
+          dateAttribution: "start" as const,
+        },
+      },
+    });
+    avgPublicId = tracker.publicId;
+  });
+
+  afterAll(async () => {
+    await archiveTracker(avgPublicId);
+  });
+
+  it("reports the day's average rather than its sum", async () => {
+    let lastBody: { todaySum: number | null } = { todaySum: null };
+    for (const steps of [20, 40]) {
+      const res = await worker.fetch(
+        makeRequest(`/trackers/${avgPublicId}/entries`, "POST", {
+          payload: { control: "stepper", date: avgDate, steps },
+        }),
+        testEnv,
+        createExecutionContext(),
+      );
+      expect(res.status).toBe(201);
+      lastBody = (await res.json()) as { todaySum: number | null };
+    }
+
+    // The quick-add response is what the widget re-renders off, so it has to agree with the list.
+    expect(lastBody.todaySum).toBe(30);
+
+    const res = await worker.fetch(
+      makeRequest(`/trackers/${avgPublicId}/heatmap?from=${avgDate}&to=${avgDate}`),
+      testEnv,
+      createExecutionContext(),
+    );
+    const body = (await res.json()) as { days: { localDate: string; sum: number | null }[] };
+    const day = body.days.find((entry) => entry.localDate === avgDate);
+    expect(day?.sum).toBe(30);
+  });
+
+  it("scores the day against the target using the aggregated value", async () => {
+    const res = await worker.fetch(
+      makeRequest(`/trackers/${avgPublicId}/heatmap?from=${avgDate}&to=${avgDate}`),
+      testEnv,
+      createExecutionContext(),
+    );
+    const body = (await res.json()) as { days: { localDate: string; state: string }[] };
+    // avg 30 is short of the target of 50 — had it read the sum of 60, this would say "met".
+    expect(body.days.find((day) => day.localDate === avgDate)?.state).toBe("partial");
+  });
+});
+
+// DEV_NOTE: direction lives on the manifest, not on the metric — the same `minutes` metric can be
+// a floor for one tracker and a ceiling for another, which is unrepresentable while one global
+// metric owns the answer. These are the two halves of that: a tracker scoring downwards, and a
+// tracker that stated nothing inheriting the metric's default.
+describe("Trackers — manifest direction", () => {
+  let capPublicId: string;
+  let inheritPublicId: string;
+  const capDate = "2026-05-01";
+
+  const minutesMetric = (key: string, defaultDirection: "higher_better" | "lower_better") => ({
+    mode: "new" as const,
+    metric: {
+      key,
+      name: `Minutes ${key}`,
+      semanticType: "duration_seconds" as const,
+      canonicalUnit: "seconds",
+      defaultAgg: "sum" as const,
+      defaultDirection,
+      dateAttribution: "start" as const,
+    },
+  });
+
+  beforeAll(async () => {
+    // A cap: 30 or fewer is the win, so a day *under* target is met and a day over it is partial.
+    const cap = await createTracker({
+      tracker: {
+        name: "Doomscrolling",
+        manifest: {
+          control: "daily_total",
+          metrics: [],
+          target: 30,
+          step: null,
+          direction: "lower_better",
+          entryMode: "retro",
+          schedule: { type: "daily" },
+          compute: null,
+        },
+        activeFrom: "2026-01-01",
+      },
+      metric: minutesMetric(`direction_cap_${Date.now()}`, "higher_better"),
+    });
+    capPublicId = cap.publicId;
+
+    const inherit = await createTracker({
+      tracker: {
+        name: "Inherits Direction",
+        manifest: {
+          control: "daily_total",
+          metrics: [],
+          target: 30,
+          step: null,
+          direction: null,
+          entryMode: "retro",
+          schedule: { type: "daily" },
+          compute: null,
+        },
+        activeFrom: "2026-01-01",
+      },
+      metric: minutesMetric(`direction_inherit_${Date.now()}`, "lower_better"),
+    });
+    inheritPublicId = inherit.publicId;
+  });
+
+  afterAll(async () => {
+    await archiveTracker(capPublicId);
+    await archiveTracker(inheritPublicId);
+  });
+
+  async function stateOn(publicId: string, date: string): Promise<string | undefined> {
+    const res = await worker.fetch(
+      makeRequest(`/trackers/${publicId}/heatmap?from=${date}&to=${date}`),
+      testEnv,
+      createExecutionContext(),
+    );
+    const body = (await res.json()) as { days: { localDate: string; state: string }[] };
+    return body.days.find((day) => day.localDate === date)?.state;
+  }
+
+  it("scores a lower_better day under target as met and over target as partial", async () => {
+    await worker.fetch(
+      makeRequest(`/trackers/${capPublicId}/entries`, "POST", {
+        payload: { control: "daily_total", date: capDate, total: 20 },
+      }),
+      testEnv,
+      createExecutionContext(),
+    );
+    expect(await stateOn(capPublicId, capDate)).toBe("met");
+
+    // daily_total replaces the day, so this is the same day blowing past the cap.
+    await worker.fetch(
+      makeRequest(`/trackers/${capPublicId}/entries`, "POST", {
+        payload: { control: "daily_total", date: capDate, total: 45 },
+      }),
+      testEnv,
+      createExecutionContext(),
+    );
+    expect(await stateOn(capPublicId, capDate)).toBe("partial");
+  });
+
+  it("resolves a null manifest direction to the metric's default on write", async () => {
+    const res = await worker.fetch(
+      makeRequest(`/trackers/${inheritPublicId}`),
+      testEnv,
+      createExecutionContext(),
+    );
+    const body = (await res.json()) as { tracker: { manifest: { direction: string | null } } };
+    expect(body.tracker.manifest.direction).toBe("lower_better");
+  });
+
+  it("PATCHing direction rescores days already logged", async () => {
+    const date = "2026-05-02";
+    await worker.fetch(
+      makeRequest(`/trackers/${inheritPublicId}/entries`, "POST", {
+        payload: { control: "daily_total", date, total: 45 },
+      }),
+      testEnv,
+      createExecutionContext(),
+    );
+    // 45 against a target of 30 — a miss while lower is better, a win the moment it isn't.
+    expect(await stateOn(inheritPublicId, date)).toBe("partial");
+
+    const patched = await worker.fetch(
+      makeRequest(`/trackers/${inheritPublicId}`, "PATCH", {
+        tracker: { manifest: { direction: "higher_better" } },
+      }),
+      testEnv,
+      createExecutionContext(),
+    );
+    expect(patched.status).toBe(200);
+    expect(await stateOn(inheritPublicId, date)).toBe("met");
   });
 });
 

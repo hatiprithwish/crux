@@ -59,7 +59,7 @@ interface MetricShape {
   key: string;
   name: string;
   defaultAgg: string;
-  direction: string;
+  defaultDirection: string;
   semanticType: string;
   canonicalUnit: string;
   usage?: { trackerCount: number; entryCount: number };
@@ -75,7 +75,7 @@ async function createMetric(key: string): Promise<MetricShape> {
         semanticType: "count",
         canonicalUnit: "reps",
         defaultAgg: "sum",
-        direction: "higher_better",
+        defaultDirection: "higher_better",
         dateAttribution: "start",
       },
     }),
@@ -221,6 +221,7 @@ describe("Deleting a metric", () => {
             metrics: [],
             target: null,
             step: null,
+            direction: null,
             entryMode: "retro",
             schedule: { type: "daily" },
             compute: null,

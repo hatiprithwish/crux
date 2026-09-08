@@ -2,6 +2,7 @@ import EntitiesDAL from "@/data-access-layer/EntitiesDAL";
 import EntriesDAL from "@/data-access-layer/EntriesDAL";
 import MetricsDAL from "@/data-access-layer/MetricsDAL";
 import TrackersDAL from "@/data-access-layer/TrackersDAL";
+import { factValue } from "@/manifest/Aggregation";
 import { planQuickAdd, type PlannedEntry } from "@/manifest/ControlHandlers";
 import { getComputeModule, validateComputeManifest } from "@/manifest/ComputeRegistry";
 import Utility from "@/utils/Utility";
@@ -102,6 +103,7 @@ export default class TrackersRepo {
                 name: declared.name,
                 semanticType: declared.semanticType,
                 canonicalUnit: declared.canonicalUnit,
+                defaultDirection: declared.defaultDirection,
               },
             ]
           : [];
@@ -203,7 +205,7 @@ export default class TrackersRepo {
           semanticType: spec.semanticType,
           canonicalUnit: spec.canonicalUnit,
           defaultAgg: spec.defaultAgg,
-          direction: spec.direction,
+          defaultDirection: spec.defaultDirection,
           dateAttribution: spec.dateAttribution,
         });
         if (!created.isSuccess || !created.metric) {
@@ -225,7 +227,14 @@ export default class TrackersRepo {
       name: params.tracker.name,
       icon: params.tracker.icon,
       colorIndex: params.tracker.colorIndex,
-      manifest: { ...params.tracker.manifest, metrics: manifestMetrics },
+      // DEV_NOTE: null direction means "inherit the metric's default", and it's resolved here
+      // rather than at read time for the same reason manifestMetrics is: the Repo owns the
+      // invariant, so a stored manifest always scores a day on its own without a metric lookup.
+      manifest: {
+        ...params.tracker.manifest,
+        metrics: manifestMetrics,
+        direction: params.tracker.manifest.direction ?? metric.defaultDirection,
+      },
       sortOrder: params.tracker.sortOrder,
       activeFrom: params.tracker.activeFrom,
       activeTo: params.tracker.activeTo,
@@ -262,8 +271,22 @@ export default class TrackersRepo {
       return { isSuccess: false, message: existing.message };
     }
 
+    const metrics = await this.loadMetrics(params.userId);
+    if (!metrics) return { isSuccess: false, message: "Failed to load metrics" };
+
     const { manifest: manifestPatch, ...columns } = params.tracker;
-    const manifest = manifestPatch ? { ...existing.tracker.manifest, ...manifestPatch } : undefined;
+    const merged = manifestPatch ? { ...existing.tracker.manifest, ...manifestPatch } : undefined;
+    // DEV_NOTE: same resolution createTracker does — an edit that clears direction is asking to go
+    // back to the metric's default, not to store a null the scoring path would have to interpret.
+    const manifest = merged
+      ? {
+          ...merged,
+          direction:
+            merged.direction ??
+            metrics.byId.get(existing.tracker.primaryMetricId)?.defaultDirection ??
+            "higher_better",
+        }
+      : undefined;
 
     // DEV_NOTE: re-validated even though control and compute can't be edited — the pairing is the
     // invariant, and a stored manifest that no longer satisfies it (a compute module retired
@@ -283,9 +306,6 @@ export default class TrackersRepo {
     if (!updated.isSuccess || !updated.tracker) {
       return { isSuccess: false, message: updated.message };
     }
-
-    const metrics = await this.loadMetrics(params.userId);
-    if (!metrics) return { isSuccess: false, message: "Failed to load metrics" };
 
     return {
       isSuccess: true,
@@ -334,16 +354,24 @@ export default class TrackersRepo {
       return { isSuccess: false, message: factsResult.message };
     }
 
-    const sumsByMetric = new Map<number, Map<string, number>>();
+    // DEV_NOTE: the day's number is whatever the metric's default_agg says it is, not its sum —
+    // see Aggregation.factValue. A null value is left out of the map entirely rather than stored as
+    // 0, so an aggregate that was never computed reads as "no data" and not as an empty day
+    // (invariant 7).
+    const valuesByMetric = new Map<number, Map<string, number>>();
     for (const fact of factsResult.dailyFacts ?? []) {
-      const byDate = sumsByMetric.get(fact.metricId) ?? new Map<string, number>();
-      byDate.set(fact.localDate, fact.sum);
-      sumsByMetric.set(fact.metricId, byDate);
+      const agg = metrics.byId.get(fact.metricId)?.defaultAgg ?? "sum";
+      const value = factValue(fact, agg);
+      if (value === null) continue;
+
+      const byDate = valuesByMetric.get(fact.metricId) ?? new Map<string, number>();
+      byDate.set(fact.localDate, value);
+      valuesByMetric.set(fact.metricId, byDate);
     }
 
     const todayShapes: Schemas.TrackerTodayApiShape[] = [];
     for (const [index, tracker] of trackers.entries()) {
-      const sums = sumsByMetric.get(tracker.primaryMetricId) ?? new Map<string, number>();
+      const sums = valuesByMetric.get(tracker.primaryMetricId) ?? new Map<string, number>();
       const todaySum = sums.has(today) ? (sums.get(today) as number) : null;
 
       let openSession: Schemas.TrackerEntryApiShape | null = null;
@@ -542,13 +570,17 @@ export default class TrackersRepo {
     dateFrom: string;
     dateTo: string;
   }): Promise<Schemas.GetTrackerHeatmapApiResponse> {
-    const trackerResult = await this.trackersDal.getTracker({
-      userId: params.userId,
-      publicId: params.publicId,
-    });
+    // DEV_NOTE: metrics are loaded here for one field — the primary metric's default_agg, which
+    // decides what a cell's number is. One indexed select of the user's own metrics, the same one
+    // every list call already makes, rather than reading `.sum` and being wrong for avg metrics.
+    const [trackerResult, metrics] = await Promise.all([
+      this.trackersDal.getTracker({ userId: params.userId, publicId: params.publicId }),
+      this.loadMetrics(params.userId),
+    ]);
     if (!trackerResult.isSuccess || !trackerResult.tracker) {
       return { isSuccess: false, message: trackerResult.message };
     }
+    if (!metrics) return { isSuccess: false, message: "Failed to load metrics" };
     const tracker = trackerResult.tracker;
 
     const factsResult = await this.entriesDal.getDailyFacts({
@@ -561,10 +593,14 @@ export default class TrackersRepo {
       return { isSuccess: false, message: factsResult.message };
     }
 
+    const agg = metrics.byId.get(tracker.primaryMetricId)?.defaultAgg ?? "sum";
     const sums = new Map(
       (factsResult.dailyFacts ?? [])
         .filter((fact) => fact.count > 0)
-        .map((fact) => [fact.localDate, fact.sum] as const),
+        .flatMap((fact) => {
+          const value = factValue(fact, agg);
+          return value === null ? [] : [[fact.localDate, value] as const];
+        }),
     );
 
     const target = tracker.manifest.target;
@@ -596,8 +632,17 @@ export default class TrackersRepo {
     if (!sums.has(localDate)) return "no_data";
 
     const target = tracker.manifest.target;
-    if (target === null) return "met";
-    return (sums.get(localDate) as number) >= target ? "met" : "partial";
+    // DEV_NOTE: architecture.md §6 — "compare using `direction` and per-row `target_at_time`". A
+    // neutral tracker states there is no better side to be on, so a logged day is met and nothing
+    // is scored against the target, exactly as a tracker with no target at all.
+    // The ?? is for manifests written before direction moved onto them (migration 0004 backfills
+    // the stored rows; this keeps an unmigrated read honest rather than crashing).
+    const direction = tracker.manifest.direction ?? "higher_better";
+    if (target === null || direction === "neutral") return "met";
+
+    const sum = sums.get(localDate) as number;
+    const met = direction === "lower_better" ? sum <= target : sum >= target;
+    return met ? "met" : "partial";
   }
 
   // DEV_NOTE: invariant 8 — streaks count through yesterday; today only extends the streak if
@@ -924,17 +969,24 @@ export default class TrackersRepo {
     localDate: string,
     response: Schemas.QuickAddApiResponse,
   ): Promise<Schemas.QuickAddApiResponse> {
-    const facts = await this.entriesDal.getDailyFacts({
-      userId,
-      metricId: tracker.primaryMetricId,
-      dateFrom: localDate,
-      dateTo: localDate,
-    });
+    const [facts, metric] = await Promise.all([
+      this.entriesDal.getDailyFacts({
+        userId,
+        metricId: tracker.primaryMetricId,
+        dateFrom: localDate,
+        dateTo: localDate,
+      }),
+      this.metricsDal.getMetricById({ userId, id: tracker.primaryMetricId }),
+    ]);
 
+    // DEV_NOTE: the same selector the list endpoint uses (Aggregation.factValue) — the widget
+    // re-renders off this number, so it has to be the number the next list call will report, not
+    // the raw sum underneath it.
     const fact = facts.dailyFacts?.[0];
+    const agg = metric.metric?.defaultAgg ?? "sum";
     return {
       ...response,
-      todaySum: fact ? fact.sum : null,
+      todaySum: fact ? factValue(fact, agg) : null,
       todayCount: fact ? fact.count : 0,
     };
   }

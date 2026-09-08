@@ -9,7 +9,7 @@ single-entity sketch. Target: Cloudflare D1 (SQLite) + Drizzle ORM.
 
 Everything a user records is an **entry** — an event in time. An entry carries one or
 more **values**, each tied to a globally-declared **metric** that knows its own type,
-unit, aggregation and direction. An entry links to zero or more **entities** (projects,
+unit and aggregation. An entry links to zero or more **entities** (projects,
 people, places) through a role-scoped join. A **tracker** is a saved configuration that
 decides what UI to render and which metrics to write — it is a row, not a deploy.
 Everything aggregatable joins on `(user_id, local_date)`. Aggregate tables are derived
@@ -59,9 +59,29 @@ semantic_type    duration_seconds | count | currency_minor | mass_grams |
                  volume_ml | energy_kcal | distance_m | rating_1_5 |
                  boolean | text | json
 
-default_agg      sum | avg | last | max | min
+default_agg      sum | avg | max | min
+                 -- what one day of the quantity means when a day holds several
+                 --   readings. Reps add up; three weigh-ins are not three times a
+                 --   body weight. Stays on the metric — every tracker writing it must
+                 --   agree, or their numbers cannot roll into one.
+                 -- all four roll up from the day grain, which is why week/month/year
+                 --   need no second cache: sum/min/max compose directly, avg is
+                 --   recomputed as SUM(sum)/SUM(count) rather than averaged again.
+                 -- no `last`: daily_facts holds sum/count/min/max/avg and nothing that
+                 --   could answer it. The daily_total control covers the case — it
+                 --   replaces the day, so the day's sum is its last value.
 
 direction        higher_better | lower_better | neutral
+                 -- lives on the tracker's manifest: it is a judgement about a habit,
+                 --   not a property of the quantity. One `minutes` metric is
+                 --   higher_better under a meditation tracker and lower_better under a
+                 --   doomscrolling one, and both still roll up together.
+                 -- neutral: recorded, never scored. No day is a win or a miss and no
+                 --   streak runs — a transfer between your own accounts, hours logged
+                 --   against a project. Distinct from "no target": it also tells a
+                 --   rollup not to colour a change as progress or regression.
+                 -- metrics.default_direction is what a new tracker inherits, and what
+                 --   a cross-tracker rollup reads (no single manifest to ask there).
 
 date_attribution start | end | split
                  -- start: meals, expenses, most events
@@ -215,7 +235,7 @@ create table metrics (
   semantic_type     text not null,
   canonical_unit    text not null,
   default_agg       text not null default 'sum',
-  direction         text not null default 'higher_better',
+  default_direction text not null default 'higher_better',   -- inherited, not enforced
   date_attribution  text not null default 'start',
   created_at        integer not null,
   updated_at        integer not null,
@@ -291,6 +311,7 @@ create table trackers (
   "metrics": ["run_duration"],
   "target": 1200,
   "step": null,
+  "direction": "higher_better",
   "entry_mode": "live",
   "schedule": { "type": "daily" },
   "compute": null
@@ -299,6 +320,11 @@ create table trackers (
 
 `schedule.type` is one of `daily` | `days_of_week` (with `days: [1,3,5]`) |
 `times_per_week` (with `count: 3`).
+
+`direction` and `target` are one question — is that number a floor or a ceiling? — so
+they live together. Sent as `null` it means "inherit `metrics.default_direction`", which
+the repository resolves to a concrete value on write, so no read path ever needs a
+metric lookup to score a day.
 
 `compute` is the escape hatch: `"workout.v1"` resolves to a registered TypeScript
 module for logic config can't express (1RM formulas, recurring transactions, grace-day
@@ -387,6 +413,11 @@ Entity-scoped fact rows are **filtered, never summed across** — summing them
 triple-counts any entry linked to three entities. The `entity_id IS NULL` row is the
 canonical total.
 
+All five aggregates are computed on every write, regardless of the metric's
+`default_agg`; the metric decides which one is _read_, in one place
+(`manifest/Aggregation.ts`). Day is the only stored grain — week, month and year are
+rollups of these rows, not caches of their own.
+
 ### Indexes
 
 ```sql
@@ -412,7 +443,8 @@ scheduled-no-data, partial (`sum / target_at_time`), met. Nothing renders before
 `trackers.active_from`.
 
 **Streaks** — fetch the range, walk descending in TypeScript. Skip unscheduled days,
-break on missing, compare using `direction` and per-row `target_at_time`. Compute on
+break on missing, compare using the manifest's `direction` and per-row `target_at_time`
+(a `neutral` tracker scores every logged day as met — it has no better side). Compute on
 read; only cache if you also invalidate on any retroactive write.
 
 **Time-tracker breakdown** — queries `entries` directly, not `daily_facts`, because it

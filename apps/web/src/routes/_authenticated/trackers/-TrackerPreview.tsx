@@ -1,5 +1,5 @@
 import type * as Schemas from "@app/schemas";
-import { describeSchedule } from "./-utils";
+import { DIRECTION_LABELS, describeSchedule } from "./-utils";
 
 // DEV_NOTE: a static mirror of TrackerRow, deliberately not TrackerRow itself. The real row is wired
 // to useQuickAdd and an archive mutation — rendering it here would mean a half-built tracker with no
@@ -11,12 +11,15 @@ import { describeSchedule } from "./-utils";
 // a user cannot see or undo from the Today screen afterwards. Showing the six fields as they will be
 // written is what makes "declared automatically from the control" a statement rather than a promise.
 
+// DEV_NOTE: no `direction` — it is a manifest field now, not a metric one, so it belongs with the
+// schedule and the control in the first panel rather than in the list of what a metric row will
+// hold. Keeping it here would have gone on telling the reader it was part of the permanent,
+// user-global side effect this panel exists to disclose.
 interface PreviewMetric {
   key: string;
   semanticType: Schemas.SemanticType;
   canonicalUnit: string;
   defaultAgg: Schemas.DefaultAgg;
-  direction: Schemas.Direction;
 }
 
 interface TrackerPreviewProps {
@@ -24,6 +27,7 @@ interface TrackerPreviewProps {
   icon: string | null;
   control: Schemas.Control;
   schedule: Schemas.TrackerSchedule;
+  direction: Schemas.Direction;
   metric: PreviewMetric;
   isExistingMetric: boolean;
 }
@@ -43,6 +47,7 @@ export function TrackerPreview({
   icon,
   control,
   schedule,
+  direction,
   metric,
   isExistingMetric,
 }: TrackerPreviewProps) {
@@ -51,7 +56,6 @@ export function TrackerPreview({
     ["semantic type", metric.semanticType],
     ["canonical unit", metric.canonicalUnit],
     ["aggregation", metric.defaultAgg],
-    ["direction", metric.direction],
     // DEV_NOTE: constant, not derived — daily_facts is keyed on (user_id, metric_id, local_date),
     // so every metric this form can declare is written at exactly this grain.
     ["grain", "user_id, local_date"],
@@ -82,7 +86,8 @@ export function TrackerPreview({
                 )}
               </span>
               <span className="text-xs text-muted-foreground">
-                {describeSchedule(schedule).toLowerCase()} · {control}
+                {describeSchedule(schedule).toLowerCase()} · {control} ·{" "}
+                {DIRECTION_LABELS[direction]}
               </span>
             </div>
           </div>

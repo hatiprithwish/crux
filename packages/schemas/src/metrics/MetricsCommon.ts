@@ -12,19 +12,26 @@ import { ZDateAttribution, ZDefaultAgg, ZDirection, ZSemanticType } from "../cor
 // DEV_NOTE: every field spelled out, no defaults — a form always holds a concrete value for each
 // one, so its validator needs an input type that matches its output type. ZMetricBase below is this
 // plus the three server-side defaults, which is what an API request validates against.
+// DEV_NOTE: `defaultDirection`, not `direction` — valence is a judgement about a habit, not a
+// property of the quantity. `minutes` is `minutes`: meditation minutes are higher_better and
+// doomscroll minutes are lower_better, and a metric global per user can't be both. The tracker's
+// manifest owns the answer (ZTrackerManifest.direction) and this is only what it inherits when the
+// tracker doesn't state one. It stays on the metric because the cross-tracker rollup
+// (EntitiesRollupCommon) aggregates a metric across every tracker that writes it — there is no
+// single manifest to ask there, so the metric-level default is the only honest answer.
 export const ZMetricValues = z.object({
   key: z.string().min(1, "Key is required"),
   name: z.string().min(1, "Name is required"),
   semanticType: ZSemanticType,
   canonicalUnit: z.string().min(1, "Unit is required"),
   defaultAgg: ZDefaultAgg,
-  direction: ZDirection,
+  defaultDirection: ZDirection,
   dateAttribution: ZDateAttribution,
 });
 
 export const ZMetricBase = ZMetricValues.extend({
   defaultAgg: ZDefaultAgg.default("sum"),
-  direction: ZDirection.default("higher_better"),
+  defaultDirection: ZDirection.default("higher_better"),
   dateAttribution: ZDateAttribution.default("start"),
 });
 export type MetricBase = z.infer<typeof ZMetricBase>;

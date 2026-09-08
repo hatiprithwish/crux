@@ -50,6 +50,7 @@ const TIME_MANIFEST = {
   metrics: [] as string[],
   target: null,
   step: null,
+  direction: null,
   entryMode: "live" as const,
   schedule: { type: "daily" as const },
   compute: null,
@@ -63,7 +64,7 @@ const durationMetric = {
     semanticType: "duration_seconds" as const,
     canonicalUnit: "seconds",
     defaultAgg: "sum" as const,
-    direction: "neutral" as const,
+    defaultDirection: "neutral" as const,
     dateAttribution: "start" as const,
   },
 };

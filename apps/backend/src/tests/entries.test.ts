@@ -67,7 +67,7 @@ describe("Substrate: entries + entry_values -> daily_facts", () => {
       semanticType: "count",
       canonicalUnit: "count",
       defaultAgg: "sum",
-      direction: "higher_better",
+      defaultDirection: "higher_better",
       dateAttribution: "start",
     });
     if (!metric.isSuccess || !metric.metric) {
@@ -84,6 +84,7 @@ describe("Substrate: entries + entry_values -> daily_facts", () => {
         metrics: [metric.metric.key],
         target: null,
         step: 1,
+        direction: null,
         entryMode: "live",
         schedule: { type: "daily" },
         compute: null,

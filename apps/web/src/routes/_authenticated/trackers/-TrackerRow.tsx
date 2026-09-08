@@ -55,22 +55,30 @@ export default function TrackerRow({ today }: TrackerRowProps) {
       )}
     >
       <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <span className="text-base font-medium">
-            {/* DEV_NOTE: underlined on hover because it is a link to the history screen — the
-                only path there now that the row no longer duplicates it as a button. */}
-            <Link
-              to="/trackers/$trackerId"
-              params={{ trackerId: tracker.publicId }}
-              className="hover:underline"
-            >
-              {tracker.name}
-            </Link>
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {describeSchedule(tracker.manifest.schedule)}
-            {today.streak > 0 ? ` · ${today.streak} day streak` : ""}
-          </span>
+        <div className="flex items-start gap-3">
+          {/* DEV_NOTE: the slot is rendered whether or not the tracker has an icon, so every name
+              in the list starts at the same x — a list where only some rows are indented is harder
+              to scan than one with no icons at all. */}
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-sm border border-border text-base">
+            {tracker.icon}
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-base font-medium">
+              {/* DEV_NOTE: underlined on hover because it is a link to the history screen — the
+                  only path there now that the row no longer duplicates it as a button. */}
+              <Link
+                to="/trackers/$trackerId"
+                params={{ trackerId: tracker.publicId }}
+                className="hover:underline"
+              >
+                {tracker.name}
+              </Link>
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {describeSchedule(tracker.manifest.schedule)}
+              {today.streak > 0 ? ` · ${today.streak} day streak` : ""}
+            </span>
+          </div>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

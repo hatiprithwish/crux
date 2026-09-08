@@ -123,6 +123,7 @@ export const trackers = table(
     publicId: t.text("public_id").notNull(),
     userId: t.text("user_id").notNull(),
     name: t.text().notNull(),
+    icon: t.text(), // single emoji, chosen from a curated set in the form
     colorIndex: t.integer("color_index"),
     primaryMetricId: t.integer("primary_metric_id").notNull(),
     manifestJson: t

@@ -1,0 +1,1 @@
+ALTER TABLE `trackers` ADD `icon` text;

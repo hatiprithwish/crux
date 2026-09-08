@@ -10,6 +10,7 @@ type CreateTrackerParams = {
   userId: string;
   primaryMetricId: number;
   name: string;
+  icon?: string | null;
   colorIndex?: number | null;
   manifest: Schemas.TrackerManifest;
   sortOrder?: number;
@@ -35,6 +36,7 @@ export default class TrackersDAL {
           publicId: Utility.generatePublicId("trk_"),
           userId: params.userId,
           name: params.name,
+          icon: params.icon ?? null,
           colorIndex: params.colorIndex ?? null,
           primaryMetricId: params.primaryMetricId,
           manifestJson: params.manifest,

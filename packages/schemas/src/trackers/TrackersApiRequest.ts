@@ -24,9 +24,13 @@ export type CreateTrackerApiRequest = z.infer<typeof ZCreateTrackerApiRequest>;
 // `kind` out of ZUpdateEntityApiRequest.
 // DEV_NOTE: strict, like the wrapper below — an edit naming `control` is a request to reinterpret
 // history, and stripping the key silently would answer it with a 200 that changed nothing.
+// DEV_NOTE: `direction` is patchable alongside `target` — the two are one judgement (is 30 minutes
+// a floor or a ceiling?), and a tracker whose target can be edited while its direction can't would
+// let a user set a cap that still scores as a floor.
 export const ZUpdateTrackerManifest = ZTrackerManifest.pick({
   target: true,
   step: true,
+  direction: true,
   entryMode: true,
   schedule: true,
 })

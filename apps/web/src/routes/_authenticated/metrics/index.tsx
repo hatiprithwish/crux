@@ -96,7 +96,7 @@ function MetricsPage() {
                         <span className="font-medium">{metric.name}</span>
                         <span className="text-xs text-muted-foreground">
                           {metric.key} · {metric.semanticType} · {metric.canonicalUnit} ·{" "}
-                          {metric.defaultAgg} · {metric.direction}
+                          {metric.defaultAgg} · default {metric.defaultDirection}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {describeUsage(metric.usage)}
@@ -136,7 +136,7 @@ function MetricsPage() {
                           semanticType: metric.semanticType,
                           canonicalUnit: metric.canonicalUnit,
                           defaultAgg: metric.defaultAgg,
-                          direction: metric.direction,
+                          defaultDirection: metric.defaultDirection,
                           dateAttribution: metric.dateAttribution,
                         }}
                         onSubmit={async (value) => {
@@ -149,7 +149,7 @@ function MetricsPage() {
                               metric: {
                                 name: value.name,
                                 defaultAgg: value.defaultAgg,
-                                direction: value.direction,
+                                defaultDirection: value.defaultDirection,
                               },
                             },
                           });

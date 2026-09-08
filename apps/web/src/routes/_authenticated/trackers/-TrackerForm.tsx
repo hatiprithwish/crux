@@ -3,9 +3,11 @@ import { useForm } from "@tanstack/react-form";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/tanstack-react-start";
 import { z } from "zod";
+import { Info } from "@phosphor-icons/react";
 import { Button } from "@/shadcn/ui/button";
 import { Input } from "@/shadcn/ui/input";
 import { FieldError } from "@/shadcn/ui/field";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover";
 import {
   Select,
   SelectContent,
@@ -23,7 +25,12 @@ import { TrackerPreview } from "./-TrackerPreview";
 import {
   AGG_LABELS,
   CONTROL_TILES,
+  DIRECTION_HELP,
+  DIRECTION_HINTS,
   DIRECTION_LABELS,
+  UNIT_FOR_SEMANTIC_TYPE,
+  UNIT_PLACEHOLDER,
+  deriveDirection,
   deriveMetricShape,
   formatStartDate,
   getTodayLocalDate,
@@ -108,13 +115,15 @@ const SCHEDULE_OPTIONS: { value: TrackerFormValues["scheduleType"]; label: strin
 // can't submit while the name is empty, so this only ever shows in the preview.
 const UNNAMED_METRIC_KEY = "untitled_tracker";
 
+// DEV_NOTE: no `direction` — that moved onto the manifest (ZTrackerManifest), because the same
+// metric points different ways for different trackers. It's a form field of its own now, sitting
+// beside the target it's scored against rather than inside the metric panel.
 interface EffectiveMetric {
   key: string;
   name: string;
   semanticType: Schemas.SemanticType;
   canonicalUnit: string;
   defaultAgg: Schemas.DefaultAgg;
-  direction: Schemas.Direction;
   dateAttribution: Schemas.DateAttribution;
 }
 
@@ -136,7 +145,6 @@ function resolveMetric(
           semanticType: chosen.semanticType,
           canonicalUnit: chosen.canonicalUnit,
           defaultAgg: chosen.defaultAgg,
-          direction: chosen.direction,
           dateAttribution: chosen.dateAttribution,
         },
       };
@@ -152,7 +160,6 @@ function resolveMetric(
         semanticType: values.semanticType,
         canonicalUnit: values.canonicalUnit,
         defaultAgg: values.defaultAgg,
-        direction: values.direction,
         dateAttribution: values.dateAttribution,
       },
     };
@@ -201,6 +208,10 @@ function valuesFromTracker(tracker: Schemas.TrackerApiShape): TrackerFormValues 
     scheduleCount: manifest.schedule.type === "times_per_week" ? manifest.schedule.count : 3,
     target: manifest.target === null ? "" : String(manifest.target),
     step: manifest.step === null ? "" : String(manifest.step),
+    // DEV_NOTE: a stored manifest always carries a resolved direction (the Repo resolves null to
+    // the metric's default on write). The fallback covers a manifest written before the field
+    // existed, in the window before migration 0004 has run against the row.
+    direction: manifest.direction ?? primary?.defaultDirection ?? "higher_better",
     activeFrom: tracker.activeFrom,
     metricMode: "existing",
     metricPublicId: tracker.primaryMetricPublicId,
@@ -252,6 +263,7 @@ export function TrackerForm({
         scheduleCount: 3,
         target: "",
         step: "",
+        direction: deriveDirection("toggle"),
         activeFrom: getTodayLocalDate(),
         metricMode: "derived",
         metricPublicId: "",
@@ -269,7 +281,11 @@ export function TrackerForm({
 
       const metricSpec: Schemas.TrackerMetricSpec = isExisting
         ? { mode: "existing", metricPublicId: value.metricPublicId }
-        : { mode: "new", metric };
+        : // DEV_NOTE: a newly declared metric is always born higher_better. The direction this
+          // tracker scores by lives in its manifest below; the metric's copy is only what a
+          // *future* tracker inherits, and "more is better" is the honest default for a measure
+          // nobody has yet said anything about.
+          { mode: "new", metric: { ...metric, defaultDirection: "higher_better" } };
 
       await onSubmit({
         tracker: {
@@ -282,6 +298,7 @@ export function TrackerForm({
             metrics: [],
             target: value.target.trim() === "" ? null : Number(value.target),
             step: value.step.trim() === "" ? null : Number(value.step),
+            direction: value.direction,
             entryMode: value.entryMode,
             schedule: buildSchedule(value),
             compute: tile.compute,
@@ -300,16 +317,42 @@ export function TrackerForm({
     const tile = CONTROL_TILES.find((option) => option.key === tileKey);
     if (!tile) return;
 
+    const previous = CONTROL_TILES.find((option) => option.key === form.getFieldValue("tileKey"));
     form.setFieldValue("tileKey", tileKey);
+
+    // DEV_NOTE: direction follows the tile only while it still holds the previous tile's suggestion
+    // — an amount pad starts as a cap and a timer as a floor. Once the user has answered the
+    // question themselves, switching tiles must not silently un-answer it.
+    if (previous && form.getFieldValue("direction") === deriveDirection(previous.control)) {
+      form.setFieldValue("direction", deriveDirection(tile.control));
+    }
 
     if (form.getFieldValue("metricMode") === "derived") {
       const shape = deriveMetricShape(tile.control);
       form.setFieldValue("semanticType", shape.semanticType);
       form.setFieldValue("canonicalUnit", shape.canonicalUnit);
       form.setFieldValue("defaultAgg", shape.defaultAgg);
-      form.setFieldValue("direction", shape.direction);
       form.setFieldValue("dateAttribution", shape.dateAttribution);
     }
+  }
+
+  // DEV_NOTE: pointing at an existing metric seeds the direction from that metric's default, which
+  // is the whole reason the default survived on the metric — "money_expense_amount" already knows
+  // it's usually a cap, so a second spending tracker doesn't have to be told again.
+  function applyExistingMetric(metricPublicId: string) {
+    form.setFieldValue("metricPublicId", metricPublicId);
+    const chosen = metrics.find((metric) => metric.publicId === metricPublicId);
+    if (chosen) form.setFieldValue("direction", chosen.defaultDirection);
+  }
+
+  // DEV_NOTE: five semantic types name their own unit (UNIT_FOR_SEMANTIC_TYPE) — picking one writes
+  // it and the unit field goes read-only. Without this the form happily stored a
+  // `duration_seconds` metric whose canonical unit was "count", which is a value nothing downstream
+  // can interpret.
+  function applySemanticType(semanticType: Schemas.SemanticType) {
+    form.setFieldValue("semanticType", semanticType);
+    const implied = UNIT_FOR_SEMANTIC_TYPE[semanticType];
+    form.setFieldValue("canonicalUnit", implied ?? "");
   }
 
   // DEV_NOTE: opening Change seeds the editable fields from whatever the derivation produced, so
@@ -340,7 +383,6 @@ export function TrackerForm({
     form.setFieldValue("semanticType", shape.semanticType);
     form.setFieldValue("canonicalUnit", shape.canonicalUnit);
     form.setFieldValue("defaultAgg", shape.defaultAgg);
-    form.setFieldValue("direction", shape.direction);
     form.setFieldValue("dateAttribution", shape.dateAttribution);
     setMetricPanelOpen(false);
   }
@@ -563,7 +605,7 @@ export function TrackerForm({
 
         {/* 4 — optional */}
         <SectionHeading index={4} title="Optional" />
-        <div className="grid grid-cols-1 border-b border-border sm:grid-cols-3">
+        <div className="grid grid-cols-1 border-b border-border sm:grid-cols-2 lg:grid-cols-4">
           <form.Field name="target">
             {(field) => (
               <div className="flex flex-col gap-2 px-6 py-5 sm:border-r sm:border-border">
@@ -579,6 +621,39 @@ export function TrackerForm({
                   className={UNDERLINE_INPUT}
                 />
                 <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+
+          {/* DEV_NOTE: next to Target on purpose — the two are one question ("is this number a
+              floor or a ceiling?"), and the backend scores a day by reading them together. */}
+          <form.Field name="direction">
+            {(field) => (
+              <div className="flex flex-col gap-2 px-6 py-5 lg:border-r lg:border-border">
+                <div className="flex items-center gap-1.5">
+                  <FieldLabelText htmlFor={field.name}>Direction</FieldLabelText>
+                  <InfoHint label="Why direction is set per tracker">{DIRECTION_HELP}</InfoHint>
+                </div>
+                <Select
+                  value={field.state.value}
+                  onValueChange={(value) => field.handleChange(value as Schemas.Direction)}
+                >
+                  <SelectTrigger id={field.name} className={UNDERLINE_TRIGGER}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {Schemas.ZDirection.options.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {DIRECTION_LABELS[option]}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <span className="text-xs text-muted-foreground">
+                  {DIRECTION_HINTS[field.state.value]}
+                </span>
               </div>
             )}
           </form.Field>
@@ -638,8 +713,7 @@ export function TrackerForm({
                   <div className="flex flex-col gap-1">
                     <span className="text-sm font-medium">Metric &amp; units</span>
                     <span className="text-xs text-muted-foreground">
-                      {metric.semanticType} · {metric.defaultAgg} ·{" "}
-                      {DIRECTION_LABELS[metric.direction]} —{" "}
+                      {metric.semanticType} · {metric.canonicalUnit} · {metric.defaultAgg} —{" "}
                       {isEditing
                         ? `writes into ${metric.key}, fixed after creation`
                         : isExisting
@@ -710,7 +784,7 @@ export function TrackerForm({
                               ) : (
                                 <Select
                                   value={field.state.value}
-                                  onValueChange={field.handleChange}
+                                  onValueChange={applyExistingMetric}
                                 >
                                   <SelectTrigger
                                     id={field.name}
@@ -784,7 +858,7 @@ export function TrackerForm({
                               <Select
                                 value={field.state.value}
                                 onValueChange={(value) =>
-                                  field.handleChange(value as Schemas.SemanticType)
+                                  applySemanticType(value as Schemas.SemanticType)
                                 }
                               >
                                 <SelectTrigger id={field.name} className="w-full">
@@ -805,18 +879,28 @@ export function TrackerForm({
                         </form.Field>
 
                         <form.Field name="canonicalUnit">
-                          {(field) => (
-                            <div className="flex flex-col gap-2">
-                              <FieldLabelText htmlFor={field.name}>Canonical unit</FieldLabelText>
-                              <Input
-                                id={field.name}
-                                value={field.state.value}
-                                onChange={(event) => field.handleChange(event.target.value)}
-                                onBlur={field.handleBlur}
-                              />
-                              <FieldError errors={field.state.meta.errors} />
-                            </div>
-                          )}
+                          {(field) => {
+                            const implied = UNIT_FOR_SEMANTIC_TYPE[values.semanticType];
+                            return (
+                              <div className="flex flex-col gap-2">
+                                <FieldLabelText htmlFor={field.name}>Canonical unit</FieldLabelText>
+                                <Input
+                                  id={field.name}
+                                  value={field.state.value}
+                                  disabled={implied !== undefined}
+                                  placeholder={UNIT_PLACEHOLDER[values.semanticType]}
+                                  onChange={(event) => field.handleChange(event.target.value)}
+                                  onBlur={field.handleBlur}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  {implied
+                                    ? `${values.semanticType} is always measured in ${implied}.`
+                                    : "What one unit of this metric is. Stored as typed — display units are converted on the way out."}
+                                </p>
+                                <FieldError errors={field.state.meta.errors} />
+                              </div>
+                            );
+                          }}
                         </form.Field>
 
                         <form.Field name="defaultAgg">
@@ -837,33 +921,6 @@ export function TrackerForm({
                                     {Schemas.ZDefaultAgg.options.map((option) => (
                                       <SelectItem key={option} value={option}>
                                         {AGG_LABELS[option]}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectGroup>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-                        </form.Field>
-
-                        <form.Field name="direction">
-                          {(field) => (
-                            <div className="flex flex-col gap-2">
-                              <FieldLabelText htmlFor={field.name}>Direction</FieldLabelText>
-                              <Select
-                                value={field.state.value}
-                                onValueChange={(value) =>
-                                  field.handleChange(value as Schemas.Direction)
-                                }
-                              >
-                                <SelectTrigger id={field.name} className="w-full">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectGroup>
-                                    {Schemas.ZDirection.options.map((option) => (
-                                      <SelectItem key={option} value={option}>
-                                        {DIRECTION_LABELS[option]}
                                       </SelectItem>
                                     ))}
                                   </SelectGroup>
@@ -975,6 +1032,7 @@ export function TrackerForm({
                 icon={values.icon}
                 control={tile.control}
                 schedule={buildSchedule(values)}
+                direction={values.direction}
                 metric={metric}
                 isExistingMetric={isExisting}
               />
@@ -1001,6 +1059,28 @@ function SectionHeading({ index, title }: { index: number; title: string }) {
         {index} · {title}
       </p>
     </div>
+  );
+}
+
+// DEV_NOTE: a popover rather than a tooltip — this explains a modelling decision in two sentences,
+// and a hover-only tooltip would be both unreadable at that length and unreachable on touch. The
+// trigger is a real button so it's keyboard-reachable, and `aria-label` carries what the icon means.
+function InfoHint({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className="text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground"
+        >
+          <Info size={14} weight="bold" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="max-w-xs text-xs leading-relaxed">
+        {children}
+      </PopoverContent>
+    </Popover>
   );
 }
 

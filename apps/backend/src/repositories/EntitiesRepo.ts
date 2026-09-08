@@ -250,7 +250,9 @@ export default class EntitiesRepo {
         semanticType: metric.semanticType,
         canonicalUnit: metric.canonicalUnit,
         defaultAgg: metric.defaultAgg,
-        direction: metric.direction,
+        // DEV_NOTE: the metric's default, deliberately — a rollup spans every tracker that ever
+        // wrote this metric, so there is no single manifest.direction to read here.
+        direction: metric.defaultDirection,
         sum: row.sum,
         count: row.count,
       });

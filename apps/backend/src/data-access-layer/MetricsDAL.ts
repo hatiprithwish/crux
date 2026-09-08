@@ -28,7 +28,7 @@ export default class MetricsDAL {
           semanticType: params.semanticType,
           canonicalUnit: params.canonicalUnit,
           defaultAgg: params.defaultAgg,
-          direction: params.direction,
+          defaultDirection: params.defaultDirection,
           dateAttribution: params.dateAttribution,
           createdAt: now,
           updatedAt: null,

@@ -67,7 +67,7 @@ const countMetric = (key: string, name: string) => ({
     semanticType: "count" as const,
     canonicalUnit: "count",
     defaultAgg: "sum" as const,
-    direction: "higher_better" as const,
+    defaultDirection: "higher_better" as const,
     dateAttribution: "start" as const,
   },
 });
@@ -78,6 +78,7 @@ function incrementManifest(step: number) {
     metrics: [] as string[],
     target: null,
     step,
+    direction: null,
     entryMode: "retro" as const,
     schedule: { type: "daily" as const },
     compute: null,

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { ZControl, ZEntryRole } from "../core/DomainEnums";
-import type { EntryKind, EntryRole, SemanticType } from "../core/DomainEnums";
+import { ZControl, ZDirection, ZEntryRole } from "../core/DomainEnums";
+import type { Direction, EntryKind, EntryRole, SemanticType } from "../core/DomainEnums";
 import { ZMetricBase } from "../metrics/MetricsCommon";
 import { ZComputeKey } from "./ComputeCommon";
 
@@ -17,11 +17,23 @@ export type TrackerSchedule = z.infer<typeof ZTrackerSchedule>;
 // DEV_NOTE: `compute` is the escape hatch — a registered module key (see ComputeCommon.ts), not
 // free text. Null for everything the seven controls already cover, which is everything except
 // Money's transfer.
+// DEV_NOTE: `direction` sits here rather than on the metric because it is one half of the same
+// judgement as `target` — architecture.md §6 scores a day by comparing the sum against
+// target_at_time *using direction*, and splitting the two across two tables put one half of a
+// comparison out of reach of the other. It also unblocks the case the metric-level field could not
+// express: two trackers on one `minutes` metric, one counting meditation up and one counting
+// doomscrolling down, without forking the key and losing the cross-tracker rollup that shared keys
+// exist for.
+//
+// DEV_NOTE: nullable = "inherit metric.defaultDirection". The Repo resolves it to a concrete value
+// on write (same as it owns manifest.metrics' primary key), so every stored manifest carries a real
+// direction and no read path has to fetch a metric to score a day.
 export const ZTrackerManifest = z.object({
   control: ZControl,
   metrics: z.array(z.string()),
   target: z.number().nullable(),
   step: z.number().nullable(),
+  direction: ZDirection.nullable(),
   entryMode: z.enum(["live", "retro"]),
   schedule: ZTrackerSchedule,
   compute: ZComputeKey.nullable(),
@@ -83,6 +95,9 @@ export interface TrackerMetricDetail {
   name: string;
   semanticType: SemanticType;
   canonicalUnit: string;
+  // DEV_NOTE: travels with the detail so the tracker form can seed its direction field from the
+  // metric the user just pointed at, without a second lookup against /metrics.
+  defaultDirection: Direction;
 }
 
 // API response shape — internal ids structurally omitted, publicId is client-facing

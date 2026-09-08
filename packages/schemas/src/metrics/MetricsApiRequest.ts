@@ -18,10 +18,10 @@ export type CreateMetricApiRequest = z.infer<typeof ZCreateMetricApiRequest>;
 // Same reasoning as an entity's immutable `kind` (see ZUpdateEntityApiRequest).
 //
 // DEV_NOTE: picked from ZMetricValues, NOT ZMetricBase — .partial() leaves a .default() in place,
-// so a patch built off ZMetricBase would parse `{}` into {defaultAgg: "sum", direction:
+// so a patch built off ZMetricBase would parse `{}` into {defaultAgg: "sum", defaultDirection:
 // "higher_better"} and quietly reset both on any edit that only sent a name.
 export const ZUpdateMetricApiRequest = z.object({
-  metric: ZMetricValues.pick({ name: true, defaultAgg: true, direction: true })
+  metric: ZMetricValues.pick({ name: true, defaultAgg: true, defaultDirection: true })
     .partial()
     .strict()
     .refine((metric) => Object.keys(metric).length > 0, {

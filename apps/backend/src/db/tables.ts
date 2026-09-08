@@ -44,7 +44,14 @@ export const metrics = table(
     semanticType: t.text("semantic_type").$type<Schemas.SemanticType>().notNull(),
     canonicalUnit: t.text("canonical_unit").notNull(),
     defaultAgg: t.text("default_agg").$type<Schemas.DefaultAgg>().notNull().default("sum"),
-    direction: t.text().$type<Schemas.Direction>().notNull().default("higher_better"),
+    // DEV_NOTE: a *default* only — the tracker's manifest owns the direction a day is scored by
+    // (ZTrackerManifest.direction). This is what a new tracker inherits, and what the cross-tracker
+    // rollup reads, since a rollup spans every tracker on the metric and has no one manifest to ask.
+    defaultDirection: t
+      .text("default_direction")
+      .$type<Schemas.Direction>()
+      .notNull()
+      .default("higher_better"),
     dateAttribution: t
       .text("date_attribution")
       .$type<Schemas.DateAttribution>()

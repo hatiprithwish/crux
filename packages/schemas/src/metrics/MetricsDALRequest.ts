@@ -14,7 +14,7 @@ export type GetMetricsDALRequest = Pick<Metric, "userId">;
 // DEV_NOTE: partial by construction — only the keys the caller actually sent are written, so an
 // edit that touched the name alone can't blank the aggregation it never showed.
 export type UpdateMetricDALRequest = Pick<Metric, "publicId" | "userId"> & {
-  fields: Partial<Pick<MetricBase, "name" | "defaultAgg" | "direction">>;
+  fields: Partial<Pick<MetricBase, "name" | "defaultAgg" | "defaultDirection">>;
 };
 
 export type DeleteMetricDALRequest = Pick<Metric, "publicId" | "userId">;

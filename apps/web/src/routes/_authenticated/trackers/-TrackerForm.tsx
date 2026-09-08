@@ -179,37 +179,86 @@ function buildSchedule(values: TrackerFormValues): Schemas.TrackerSchedule {
   return { type: "daily" };
 }
 
+// DEV_NOTE: the inverse of the submit handler — a stored tracker read back into the flat field
+// shape. metricMode is always "existing" here because editing can't repoint the metric
+// (ZUpdateTrackerApiRequest omits it): the tracker's entries already point at that metric, so the
+// panel shows which one it writes rather than offering to change it.
+function valuesFromTracker(tracker: Schemas.TrackerApiShape): TrackerFormValues {
+  const { manifest } = tracker;
+  const tile =
+    CONTROL_TILES.find(
+      (option) => option.control === manifest.control && option.compute === manifest.compute,
+    ) ?? CONTROL_TILES[0];
+  const primary = tracker.metricDetails.find((detail) => detail.key === tracker.primaryMetricKey);
+
+  return {
+    name: tracker.name,
+    icon: tracker.icon ?? null,
+    tileKey: tile.key,
+    entryMode: manifest.entryMode,
+    scheduleType: manifest.schedule.type,
+    scheduleDays: manifest.schedule.type === "days_of_week" ? manifest.schedule.days : [],
+    scheduleCount: manifest.schedule.type === "times_per_week" ? manifest.schedule.count : 3,
+    target: manifest.target === null ? "" : String(manifest.target),
+    step: manifest.step === null ? "" : String(manifest.step),
+    activeFrom: tracker.activeFrom,
+    metricMode: "existing",
+    metricPublicId: tracker.primaryMetricPublicId,
+    metricKey: tracker.primaryMetricKey,
+    metricName: primary?.name ?? tracker.name,
+    // DEV_NOTE: the derived shape is a fallback only — resolveMetric reads the real six fields off
+    // the fetched /metrics row for mode "existing", and these are what the preview renders in the
+    // moment before that request lands.
+    ...deriveMetricShape(manifest.control),
+    ...(primary
+      ? { semanticType: primary.semanticType, canonicalUnit: primary.canonicalUnit }
+      : {}),
+  };
+}
+
 interface TrackerFormProps {
   onSubmit: (value: Schemas.CreateTrackerApiRequest) => Promise<void>;
   onCancel: () => void;
   submitLabel?: string;
+  // DEV_NOTE: present = edit an existing tracker. The form still emits a full
+  // CreateTrackerApiRequest either way and the edit screen narrows it to the patchable fields —
+  // one submit shape, so the preview and the payload can't drift apart between the two modes.
+  tracker?: Schemas.TrackerApiShape;
 }
 
-export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: TrackerFormProps) {
+export function TrackerForm({
+  onSubmit,
+  onCancel,
+  submitLabel = "Save",
+  tracker,
+}: TrackerFormProps) {
   const { getToken } = useAuth();
   const metricsQuery = useQuery(MetricsQueries.list(getToken));
   const metrics = metricsQuery.data?.metrics ?? [];
 
+  const isEditing = tracker !== undefined;
   const [metricPanelOpen, setMetricPanelOpen] = useState(false);
   const [computePanelOpen, setComputePanelOpen] = useState(false);
 
-  const defaultValues: TrackerFormValues = {
-    name: "",
-    icon: null,
-    tileKey: "toggle",
-    entryMode: "retro",
-    scheduleType: "daily",
-    scheduleDays: [],
-    scheduleCount: 3,
-    target: "",
-    step: "",
-    activeFrom: getTodayLocalDate(),
-    metricMode: "derived",
-    metricPublicId: "",
-    metricKey: "",
-    metricName: "",
-    ...deriveMetricShape("toggle"),
-  };
+  const defaultValues: TrackerFormValues = tracker
+    ? valuesFromTracker(tracker)
+    : {
+        name: "",
+        icon: null,
+        tileKey: "toggle",
+        entryMode: "retro",
+        scheduleType: "daily",
+        scheduleDays: [],
+        scheduleCount: 3,
+        target: "",
+        step: "",
+        activeFrom: getTodayLocalDate(),
+        metricMode: "derived",
+        metricPublicId: "",
+        metricKey: "",
+        metricName: "",
+        ...deriveMetricShape("toggle"),
+      };
 
   const form = useForm({
     defaultValues,
@@ -306,9 +355,13 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
     >
       <div className="flex flex-col border-border lg:border-r">
         <header className="px-6 py-8">
-          <h1 className="font-heading text-3xl font-semibold">New tracker</h1>
+          <h1 className="font-heading text-3xl font-semibold">
+            {isEditing ? "Edit tracker" : "New tracker"}
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Name it and pick how you&rsquo;ll log it. Everything else has a sane default.
+            {isEditing
+              ? "Rename it, retarget it, reschedule it. The control and metric stay fixed — everything already logged was written through them."
+              : "Name it and pick how you’ll log it. Everything else has a sane default."}
           </p>
         </header>
 
@@ -361,12 +414,18 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
                       key={tile.key}
                       type="button"
                       aria-pressed={selected}
+                      disabled={isEditing}
                       onClick={() => applyTile(tile.key)}
                       className={cn(
                         "flex flex-col items-start gap-1 border-r border-b border-border px-4 py-3 text-left transition-colors",
                         selected
                           ? "bg-primary text-primary-foreground"
                           : "hover:bg-accent hover:text-accent-foreground",
+                        // DEV_NOTE: the unselected tiles fade out rather than the whole grid — the
+                        // control a tracker already has is still worth reading at full contrast.
+                        isEditing &&
+                          !selected &&
+                          "opacity-40 hover:bg-transparent hover:text-inherit",
                       )}
                     >
                       <span className="text-sm font-medium">{tile.label}</span>
@@ -384,6 +443,12 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
               </div>
             )}
           </form.Subscribe>
+          {isEditing ? (
+            <p className="mt-3 text-xs text-muted-foreground">
+              The control is fixed after creation. Every entry this tracker holds was written
+              through it — a timer&rsquo;s seconds would be read as a count under any other one.
+            </p>
+          ) : null}
         </div>
 
         {/* 3 — how often */}
@@ -575,22 +640,30 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
                     <span className="text-xs text-muted-foreground">
                       {metric.semanticType} · {metric.defaultAgg} ·{" "}
                       {DIRECTION_LABELS[metric.direction]} —{" "}
-                      {isExisting
-                        ? `writes into ${metric.key}`
-                        : "declared automatically from the control"}
+                      {isEditing
+                        ? `writes into ${metric.key}, fixed after creation`
+                        : isExisting
+                          ? `writes into ${metric.key}`
+                          : "declared automatically from the control"}
                     </span>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0 tracking-wider uppercase"
-                    onClick={() =>
-                      metricPanelOpen ? setMetricPanelOpen(false) : openMetricPanel()
-                    }
-                  >
-                    {metricPanelOpen ? "Done" : "Change"}
-                  </Button>
+                  {/* DEV_NOTE: no Change in edit mode — repointing the metric would detach every
+                      entry already written from this tracker's heatmap and streak, so the API
+                      doesn't accept it (ZUpdateTrackerApiRequest) and the form doesn't offer it.
+                      A metric's own six fields are still editable on the /metrics screen. */}
+                  {isEditing ? null : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 tracking-wider uppercase"
+                      onClick={() =>
+                        metricPanelOpen ? setMetricPanelOpen(false) : openMetricPanel()
+                      }
+                    >
+                      {metricPanelOpen ? "Done" : "Change"}
+                    </Button>
+                  )}
                 </div>
 
                 {metricPanelOpen ? (
@@ -823,15 +896,19 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
                         : "None. Only money transfers need one today."}
                     </span>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0 tracking-wider uppercase"
-                    onClick={() => setComputePanelOpen((open) => !open)}
-                  >
-                    {computePanelOpen ? "Done" : "Change"}
-                  </Button>
+                  {/* DEV_NOTE: the panel's only content is "pick the Transfer tile", and the tiles
+                      are locked in edit mode — so there is nothing here to open. */}
+                  {isEditing ? null : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 tracking-wider uppercase"
+                      onClick={() => setComputePanelOpen((open) => !open)}
+                    >
+                      {computePanelOpen ? "Done" : "Change"}
+                    </Button>
+                  )}
                 </div>
 
                 {computePanelOpen ? (
@@ -878,7 +955,7 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
           <form.Subscribe selector={(state) => state.isSubmitting}>
             {(isSubmitting) => (
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : submitLabel}
+                {isSubmitting ? "Saving..." : submitLabel}
               </Button>
             )}
           </form.Subscribe>

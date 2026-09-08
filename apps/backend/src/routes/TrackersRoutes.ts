@@ -95,6 +95,26 @@ TrackersRoutes.get("/:publicId", checkAuth, zValidator("param", ZPublicIdParam),
   return c.json(response, response.isSuccess ? 200 : 404);
 });
 
+// DEV_NOTE: PATCH, not PUT — the body is a partial by design (ZUpdateTrackerApiRequest), and the
+// fields it deliberately can't name (control, compute, the primary metric) must keep their stored
+// values rather than being absent from a full replacement.
+TrackersRoutes.patch(
+  "/:publicId",
+  checkAuth,
+  zValidator("param", ZPublicIdParam),
+  zValidator("json", Schemas.ZUpdateTrackerApiRequest),
+  async (c) => {
+    const userId = c.get("clerkUserId");
+    const { publicId } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const repo = new TrackersRepo(c.env);
+    const response = await repo.updateTracker({ userId, publicId, tracker: body.tracker });
+
+    return c.json(response, response.isSuccess ? 200 : 404);
+  },
+);
+
 TrackersRoutes.delete("/:publicId", checkAuth, zValidator("param", ZPublicIdParam), async (c) => {
   const userId = c.get("clerkUserId");
   const { publicId } = c.req.valid("param");

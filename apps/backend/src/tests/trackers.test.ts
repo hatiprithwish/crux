@@ -214,6 +214,114 @@ describe("Trackers routes (authenticated)", () => {
   });
 });
 
+// DEV_NOTE: editing is narrower than creating on purpose — the control and the primary metric are
+// what every entry already written was shaped by and points at, so they are absent from the request
+// schema entirely. These tests pin both halves: what an edit may change, and what it may not name.
+describe("Trackers — editing", () => {
+  let ctx: ExecutionContext;
+
+  beforeEach(() => {
+    ctx = createExecutionContext();
+  });
+
+  it("PATCH /trackers/:publicId updates the named fields and leaves the rest alone", async () => {
+    const tracker = await createTracker({
+      tracker: {
+        name: "Tracker To Edit",
+        icon: "🛁",
+        manifest: { ...habitManifest(), target: 1 },
+        activeFrom: today,
+      },
+      metric: newMetricSpec("Tracker To Edit"),
+    });
+
+    const res = await worker.fetch(
+      makeRequest(`/trackers/${tracker.publicId}`, "PATCH", {
+        tracker: {
+          name: "Renamed Tracker",
+          manifest: { target: 3, schedule: { type: "days_of_week", days: [1, 3, 5] } },
+        },
+      }),
+      testEnv,
+      ctx,
+    );
+    await waitOnExecutionContext(ctx);
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as {
+      tracker?: {
+        name: string;
+        icon: string | null;
+        primaryMetricPublicId: string;
+        manifest: {
+          control: string;
+          metrics: string[];
+          target: number | null;
+          entryMode: string;
+          schedule: { type: string; days?: number[] };
+        };
+      };
+    };
+
+    expect(body.tracker?.name).toBe("Renamed Tracker");
+    expect(body.tracker?.manifest.target).toBe(3);
+    expect(body.tracker?.manifest.schedule).toEqual({ type: "days_of_week", days: [1, 3, 5] });
+    // Untouched fields survive a partial write — including the manifest keys the patch never named.
+    expect(body.tracker?.icon).toBe("🛁");
+    expect(body.tracker?.manifest.control).toBe("toggle");
+    expect(body.tracker?.manifest.entryMode).toBe("retro");
+    expect(body.tracker?.manifest.metrics).toEqual([tracker.primaryMetricKey]);
+    expect(body.tracker?.primaryMetricPublicId).toBe(tracker.primaryMetricPublicId);
+
+    await archiveTracker(tracker.publicId);
+  });
+
+  it("rejects an edit naming the control, and one naming no fields at all", async () => {
+    const tracker = await createTracker({
+      tracker: { name: "Tracker With Fixed Control", manifest: habitManifest(), activeFrom: today },
+      metric: newMetricSpec("Tracker With Fixed Control"),
+    });
+
+    const controlRes = await worker.fetch(
+      makeRequest(`/trackers/${tracker.publicId}`, "PATCH", {
+        tracker: { manifest: { control: "timer" } },
+      }),
+      testEnv,
+      ctx,
+    );
+    await waitOnExecutionContext(ctx);
+    expect(controlRes.status).toBe(400);
+
+    const emptyRes = await worker.fetch(
+      makeRequest(`/trackers/${tracker.publicId}`, "PATCH", { tracker: {} }),
+      testEnv,
+      createExecutionContext(),
+    );
+    expect(emptyRes.status).toBe(400);
+
+    // The rejected edits changed nothing.
+    const getRes = await worker.fetch(
+      makeRequest(`/trackers/${tracker.publicId}`),
+      testEnv,
+      createExecutionContext(),
+    );
+    const stored = (await getRes.json()) as { tracker: { manifest: { control: string } } };
+    expect(stored.tracker.manifest.control).toBe("toggle");
+
+    await archiveTracker(tracker.publicId);
+  });
+
+  it("PATCH on an unknown tracker is a 404", async () => {
+    const res = await worker.fetch(
+      makeRequest("/trackers/trk_does_not_exist", "PATCH", { tracker: { name: "Nope" } }),
+      testEnv,
+      ctx,
+    );
+    await waitOnExecutionContext(ctx);
+    expect(res.status).toBe(404);
+  });
+});
+
 // DEV_NOTE: docs/archive/implementation.md Phase 6's testable unit — a toggle tracker created through the
 // generic flow, with zero code specific to habits anywhere behind it, behaving exactly as the
 // Phase-0 hardcoded Habit did: idempotent day logging, daily_facts materialised on write and gone

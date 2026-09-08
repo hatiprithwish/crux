@@ -15,6 +15,13 @@
       "when": 1788542841599,
       "tag": "0001_crux",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788839588339,
+      "tag": "0002_crux",
+      "breakpoints": true
     }
   ]
 }

@@ -19,7 +19,7 @@ vi.mock("@/routes/_authenticated/trackers/-data", () => ({
 
 // DEV_NOTE: EntityLinkFields owns five entity queries of its own — the controls that embed it
 // (amount_pad, form) are exercised here for their dispatch, not their entity picker, so it's
-// stubbed the same lightweight way NoteCard's test stubs its data layer.
+// stubbed out lightweight instead of exercised for real.
 vi.mock("@/routes/_authenticated/trackers/-EntityLinkFields", () => ({
   EntityLinkFields: () => null,
 }));

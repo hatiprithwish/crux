@@ -196,7 +196,7 @@ export default class EntitiesRepo {
     };
   }
 
-  // DEV_NOTE: architecture.md §6 / implementation.md Phase 4 — one entity's total across every
+  // DEV_NOTE: architecture.md §6 / docs/archive/implementation.md Phase 4 — one entity's total across every
   // metric that points at it, which is the whole payoff of metrics being declared globally rather
   // than per tracker (§5). A tracker never appears here: two trackers writing the same metric roll
   // into one row, which is exactly the point.

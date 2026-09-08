@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { DotsThree, Archive } from "@phosphor-icons/react";
 import { Button } from "@/shadcn/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shadcn/ui/card";
+import { cn } from "@/utils/tailwind";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,11 +45,18 @@ export default function TrackerRow({ today }: TrackerRowProps) {
     onQuickAdd: (payload) => quickAdd.mutate({ publicId: tracker.publicId, payload }),
   };
 
+  const isRunning = tracker.manifest.control === "timer" && today.openSession !== null;
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
+    <div
+      className={cn(
+        "flex flex-col gap-3 border-b border-border py-4 pl-4 first:pt-0 last:border-b-0",
+        isRunning && "border-l-2 border-l-primary bg-primary/5",
+      )}
+    >
+      <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <CardTitle>
+          <span className="text-base font-medium">
             {/* DEV_NOTE: underlined on hover because it is a link to the history screen — the
                 only path there now that the row no longer duplicates it as a button. */}
             <Link
@@ -59,7 +66,7 @@ export default function TrackerRow({ today }: TrackerRowProps) {
             >
               {tracker.name}
             </Link>
-          </CardTitle>
+          </span>
           <span className="text-xs text-muted-foreground">
             {describeSchedule(tracker.manifest.schedule)}
             {today.streak > 0 ? ` · ${today.streak} day streak` : ""}
@@ -82,9 +89,9 @@ export default function TrackerRow({ today }: TrackerRowProps) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </CardHeader>
-      <CardContent>{renderControl(tracker.manifest.control, controlProps)}</CardContent>
-    </Card>
+      </div>
+      {renderControl(tracker.manifest.control, controlProps)}
+    </div>
   );
 }
 

@@ -317,6 +317,41 @@ export default class TrackersRepo {
     };
   }
 
+  // DEV_NOTE: backs the Today screen's ruler (docs/redesign-backlog.md's timeline ruler item) — a
+  // flat, cross-tracker list of today's entries, not per-tracker like everything else in this file.
+  async getTimeline(params: {
+    userId: string;
+    date?: string;
+  }): Promise<Schemas.GetTrackerTimelineApiResponse> {
+    const localDate = params.date ?? this.todayLocalDate();
+
+    const [entriesResult, trackersResult] = await Promise.all([
+      this.entriesDal.getEntriesForDate({ userId: params.userId, localDate }),
+      this.trackersDal.getTrackers({ userId: params.userId }),
+    ]);
+    if (!entriesResult.isSuccess || !entriesResult.entries) {
+      return { isSuccess: false, message: entriesResult.message };
+    }
+    if (!trackersResult.isSuccess || !trackersResult.trackers) {
+      return { isSuccess: false, message: trackersResult.message };
+    }
+
+    const publicIdById = new Map(
+      trackersResult.trackers.map((tracker) => [tracker.id, tracker.publicId]),
+    );
+
+    const entries: Schemas.TrackerTimelineEntryApiShape[] = entriesResult.entries
+      .filter((entry) => publicIdById.has(entry.trackerId))
+      .map((entry) => ({
+        trackerPublicId: publicIdById.get(entry.trackerId) as string,
+        occurredAt: entry.occurredAt,
+        endedAt: entry.endedAt ?? null,
+      }))
+      .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+
+    return { isSuccess: true, message: "Timeline fetched successfully", entries };
+  }
+
   async getTracker(params: {
     userId: string;
     publicId: string;

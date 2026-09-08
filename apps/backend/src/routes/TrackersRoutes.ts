@@ -53,6 +53,23 @@ TrackersRoutes.post("/unarchive-all", checkAuth, async (c) => {
   return c.json(response, response.isSuccess ? 200 : 500);
 });
 
+// DEV_NOTE: registered before /:publicId below for the same reason as unarchive-all — "today" must
+// never be parsed as a tracker publicId.
+TrackersRoutes.get(
+  "/today/timeline",
+  checkAuth,
+  zValidator("query", Schemas.ZTrackerTimelineApiQuery),
+  async (c) => {
+    const userId = c.get("clerkUserId");
+    const { date } = c.req.valid("query");
+
+    const repo = new TrackersRepo(c.env);
+    const response = await repo.getTimeline({ userId, date });
+
+    return c.json(response, response.isSuccess ? 200 : 500);
+  },
+);
+
 TrackersRoutes.post(
   "/:publicId/unarchive",
   checkAuth,

@@ -59,7 +59,7 @@ function dayBefore(n: number): string {
 }
 
 // DEV_NOTE: the Phase-0-era habit, expressed as a manifest instead of as HabitsRepo — a toggle
-// control on a dedicated boolean metric, daily schedule, no target. implementation.md's Phase 6
+// control on a dedicated boolean metric, daily schedule, no target. docs/archive/implementation.md's Phase 6
 // testable unit is that this behaves identically to the hardcoded version it replaced.
 function habitManifest(entryMode: "live" | "retro" = "retro") {
   return {
@@ -214,7 +214,7 @@ describe("Trackers routes (authenticated)", () => {
   });
 });
 
-// DEV_NOTE: implementation.md Phase 6's testable unit — a toggle tracker created through the
+// DEV_NOTE: docs/archive/implementation.md Phase 6's testable unit — a toggle tracker created through the
 // generic flow, with zero code specific to habits anywhere behind it, behaving exactly as the
 // Phase-0 hardcoded Habit did: idempotent day logging, daily_facts materialised on write and gone
 // on unlog, range reads.
@@ -490,7 +490,7 @@ describe("Trackers — heatmap + streak", () => {
       .set({ activeFrom: dayBefore(6) })
       .where(eq(trackers.publicId, trackerPublicId));
 
-    // Log days 5,4 ago and 2,1 ago — a gap on day 3 (implementation.md Phase 1's testable unit).
+    // Log days 5,4 ago and 2,1 ago — a gap on day 3 (docs/archive/implementation.md Phase 1's testable unit).
     for (const n of [5, 4, 2, 1]) {
       await worker.fetch(
         makeRequest(`/trackers/${trackerPublicId}/entries`, "POST", {
@@ -546,6 +546,69 @@ describe("Trackers — heatmap + streak", () => {
     const row = body.today.find((entry) => entry.tracker.publicId === trackerPublicId);
     expect(row?.streak).toBe(2);
     expect(row?.todaySum).toBeNull();
+  });
+});
+
+describe("Trackers — today timeline", () => {
+  let loggedPublicId: string;
+  let unloggedPublicId: string;
+
+  beforeAll(async () => {
+    const logged = await createTracker({
+      tracker: { name: "Timeline Logged Habit", manifest: habitManifest(), activeFrom: today },
+      metric: newMetricSpec("Timeline Logged Habit"),
+    });
+    loggedPublicId = logged.publicId;
+
+    const unlogged = await createTracker({
+      tracker: { name: "Timeline Unlogged Habit", manifest: habitManifest(), activeFrom: today },
+      metric: newMetricSpec("Timeline Unlogged Habit"),
+    });
+    unloggedPublicId = unlogged.publicId;
+
+    await worker.fetch(
+      makeRequest(`/trackers/${loggedPublicId}/entries`, "POST", {
+        payload: { control: "toggle", date: today, completed: true },
+      }),
+      testEnv,
+      createExecutionContext(),
+    );
+  });
+
+  afterAll(async () => {
+    await archiveTracker(loggedPublicId);
+    await archiveTracker(unloggedPublicId);
+  });
+
+  it("returns one tick for the logged tracker and nothing for the unlogged one", async () => {
+    const res = await worker.fetch(
+      makeRequest("/trackers/today/timeline"),
+      testEnv,
+      createExecutionContext(),
+    );
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as {
+      entries: { trackerPublicId: string; occurredAt: string }[];
+    };
+    const forLogged = body.entries.filter((entry) => entry.trackerPublicId === loggedPublicId);
+    const forUnlogged = body.entries.filter((entry) => entry.trackerPublicId === unloggedPublicId);
+
+    expect(forLogged).toHaveLength(1);
+    expect(forUnlogged).toHaveLength(0);
+    expect(new Date(forLogged[0].occurredAt).toISOString().slice(0, 10)).toBe(today);
+  });
+
+  it("an explicit ?date= in the past returns none of today's entries", async () => {
+    const res = await worker.fetch(
+      makeRequest(`/trackers/today/timeline?date=${dayBefore(30)}`),
+      testEnv,
+      createExecutionContext(),
+    );
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { entries: { trackerPublicId: string }[] };
+    expect(body.entries.some((entry) => entry.trackerPublicId === loggedPublicId)).toBe(false);
   });
 });
 

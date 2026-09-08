@@ -12,13 +12,13 @@
 
 ### Golden files
 
-| Layer               | File                                                 |
-| ------------------- | ---------------------------------------------------- |
-| DAL                 | `apps/backend/src/data-access-layer/NotesDAL.ts`     |
-| Repository          | `apps/backend/src/repositories/NotesRepo.ts`         |
-| Routes              | `apps/backend/src/routes/NotesRoutes.ts`             |
-| Frontend data layer | `apps/web/src/routes/_authenticated/notes/-data.ts`  |
-| Frontend page       | `apps/web/src/routes/_authenticated/notes/index.tsx` |
+| Layer               | File                                                    |
+| ------------------- | ------------------------------------------------------- |
+| DAL                 | `apps/backend/src/data-access-layer/EntitiesDAL.ts`     |
+| Repository          | `apps/backend/src/repositories/EntitiesRepo.ts`         |
+| Routes              | `apps/backend/src/routes/EntitiesRoutes.ts`             |
+| Frontend data layer | `apps/web/src/routes/_authenticated/entities/-data.ts`  |
+| Frontend page       | `apps/web/src/routes/_authenticated/entities/index.tsx` |
 
 ## Stack
 
@@ -39,8 +39,8 @@ Before using any third-party API: check the installed version in `package.json`,
 
 ## Conventions
 
-- **Status Enum Pattern** (any discrete-state field): DB stores int only. Define `<Feature>StatusIntEnum`, `<Feature>StatusLabelEnum`, `<FEATURE>_STATUS_LABEL_MAP` in `<Feature>Common.ts`. DAL returns raw int; Repo maps int→label in a private `withStatusLabel`; API response always carries both `<feature>Status` (int) and `<feature>StatusLabel` (string). See `NotesCommon.ts` / `NotesRepo.ts`.
-- **Public ID Pattern** (every table): `id` (autoincrement int) is internal-only — joins/FKs, never sent to or accepted from a client. `publicId` (`Utility.generatePublicId()`, unique-indexed) is client-facing — every route param, API response, and frontend reference uses it instead. DAL generates it on insert and finds rows by it; API response types structurally omit `id` (`Omit<Note, "id">`). See `NotesCommon.ts` / `NotesDAL.ts` / `NotesRoutes.ts`.
+- **Status Enum Pattern** (any discrete-state field): DB stores int only. Define `<Feature>StatusIntEnum`, `<Feature>StatusLabelEnum`, `<FEATURE>_STATUS_LABEL_MAP` in `<Feature>Common.ts`. DAL returns raw int; Repo maps int→label in a private `withStatusLabel`; API response always carries both `<feature>Status` (int) and `<feature>StatusLabel` (string).
+- **Public ID Pattern** (every table): `id` (autoincrement int) is internal-only — joins/FKs, never sent to or accepted from a client. `publicId` (`Utility.generatePublicId()`, unique-indexed) is client-facing — every route param, API response, and frontend reference uses it instead. DAL generates it on insert and finds rows by it; API response types structurally omit `id` (`Omit<Entity, "id">`). See `EntitiesCommon.ts` / `EntitiesDAL.ts` / `EntitiesRoutes.ts`.
 - **DB tables**: `sqliteTable` aliased `table`; camelCase in code, `snake_case` in DB; timestamps as `t.integer({ mode: "timestamp" })`; `createdAt` notNull + `updatedAt` nullable; index every FK; unique-index `publicId` and any other unique field.
 - **DAL**: class holding `private db`, ctor takes `env`. Every method inits `{ isSuccess: false }`, try/catch, `AppLogger.error` with `LogCategory`/`LogAction` on failure.
 - **Repo**: thin — maps API shapes to DAL params, business logic lives here, not in DAL.

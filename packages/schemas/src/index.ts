@@ -1,5 +1,4 @@
 export * from "./users";
-export * from "./notes";
 export * from "./core";
 export * from "./entities";
 export * from "./metrics";

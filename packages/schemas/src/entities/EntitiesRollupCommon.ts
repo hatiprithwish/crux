@@ -12,7 +12,7 @@ import type {
 // 'Fitness' number because they point at the same entity row." This is the read surface for that:
 // one entity, every metric that has ever been attributed to it, over a date range.
 //
-// DEV_NOTE: implementation.md Phase 4 says "one hand-written query", and that's deliberate — this is
+// DEV_NOTE: docs/archive/implementation.md Phase 4 says "one hand-written query", and that's deliberate — this is
 // NOT a generic cross-domain query builder (§7 step 6: "productise only the five or six queries you
 // actually re-run"). One entity, one optional role slice, sums per metric.
 

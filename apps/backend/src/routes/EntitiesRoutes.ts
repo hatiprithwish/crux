@@ -99,7 +99,7 @@ EntitiesRoutes.delete("/:publicId", checkAuth, zValidator("param", ZPublicIdPara
   return c.json(response, response.isSuccess ? 200 : 404);
 });
 
-// DEV_NOTE: implementation.md Phase 4 — the cross-domain read. Deliberately hung off the entity, not
+// DEV_NOTE: docs/archive/implementation.md Phase 4 — the cross-domain read. Deliberately hung off the entity, not
 // off a tracker: the question is "everything that points at this thing", and trackers are exactly
 // what it looks past.
 EntitiesRoutes.get(

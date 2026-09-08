@@ -3,6 +3,7 @@ import type {
   TrackerBreakdownRow,
   TrackerEntryApiShape,
   TrackerHeatmapDay,
+  TrackerTimelineEntryApiShape,
   TrackerTodayApiShape,
 } from "./TrackersCommon";
 import type { MoneyTransferComputeResult } from "./ComputeCommon";
@@ -46,6 +47,12 @@ export interface GetTrackerBreakdownApiResponse extends ApiResponse {
 
 export interface GetRunningSessionApiResponse extends ApiResponse {
   session?: TrackerEntryApiShape | null;
+}
+
+// DEV_NOTE: today's timeline is a cross-tracker read (unlike everything else in this file, which is
+// scoped to one tracker) — it backs the Today screen's ruler, not a tracker detail page.
+export interface GetTrackerTimelineApiResponse extends ApiResponse {
+  entries?: TrackerTimelineEntryApiShape[];
 }
 
 // DEV_NOTE: one response type per compute module's result — a second module adds a member here, not

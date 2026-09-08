@@ -175,6 +175,43 @@ export default class EntriesDAL {
     return response;
   }
 
+  // DEV_NOTE: the Today screen's ruler — every entry logged on one local_date, across every tracker
+  // the user owns. Unlike getEntries above, this is deliberately not scoped to a trackerId: it's the
+  // one place the DAL answers a cross-tracker question, because splitting it into N per-tracker
+  // calls would cost N round trips against a remote D1 binding for what is one indexed date scan.
+  async getEntriesForDate(params: { userId: string; localDate: string }) {
+    const response: Schemas.ApiResponse & { entries?: Schemas.Entry[] } = { isSuccess: false };
+
+    try {
+      const entriesResponse = await this.db
+        .select()
+        .from(entries)
+        .where(
+          and(
+            eq(entries.userId, params.userId),
+            eq(entries.localDate, params.localDate),
+            isNull(entries.deletedAt),
+          ),
+        );
+
+      response.isSuccess = true;
+      response.message = "Entries fetched successfully";
+      response.entries = entriesResponse;
+    } catch (error) {
+      const message = "Unknown error in listing entries for date";
+      AppLogger.error({
+        category: Schemas.LogCategory.DAL,
+        action: Schemas.LogAction.GetTrackerTimeline,
+        message,
+        error,
+        metadata: params,
+      });
+      response.message = message;
+    }
+
+    return response;
+  }
+
   // DEV_NOTE: architecture.md §6 "Habit heatmap"/"Streaks" — one indexed range scan of daily_facts
   // (IDX_daily_facts_lookup covers userId+metricId+localDate) for the entityId IS NULL row, the
   // canonical un-attributed total. Callers build the full day list themselves — a date with no row
@@ -594,7 +631,7 @@ export default class EntriesDAL {
     return response;
   }
 
-  // DEV_NOTE: architecture.md §6 "Cross-domain aggregation" / implementation.md Phase 4 — the one
+  // DEV_NOTE: architecture.md §6 "Cross-domain aggregation" / docs/archive/implementation.md Phase 4 — the one
   // hand-written cross-domain query, not a query builder. One entity, every metric attributed to it,
   // summed over a date range.
   //

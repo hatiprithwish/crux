@@ -18,13 +18,6 @@ export enum LogAction {
   // User
   GetUserDetails = "GetUserDetails",
 
-  // Notes
-  CreateNote = "CreateNote",
-  GetNoteDetails = "GetNoteDetails",
-  ListNotes = "ListNotes",
-  UpdateNote = "UpdateNote",
-  DeleteNote = "DeleteNote",
-
   // Substrate — entities
   CreateEntity = "CreateEntity",
   GetEntityDetails = "GetEntityDetails",
@@ -67,6 +60,7 @@ export enum LogAction {
   QuickAddEntry = "QuickAddEntry",
   GetTrackerHeatmap = "GetTrackerHeatmap",
   GetTrackerBreakdown = "GetTrackerBreakdown",
+  GetTrackerTimeline = "GetTrackerTimeline",
   RunCompute = "RunCompute",
 
   // Infra — weekly orphan scan (architecture.md §4.1)

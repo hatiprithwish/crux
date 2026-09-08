@@ -239,3 +239,12 @@ export interface TrackerTodayApiShape {
   streak: number;
   openSession: TrackerEntryApiShape | null; // timer trackers only
 }
+
+// DEV_NOTE: the Today screen's 24h ruler — one tick per entry logged today, across every tracker.
+// Deliberately slimmer than TrackerEntryApiShape (no values, no entities): the ruler only ever
+// plots occurredAt/endedAt, and fetching the rest per entry would cost a join the ruler doesn't need.
+export interface TrackerTimelineEntryApiShape {
+  trackerPublicId: string;
+  occurredAt: Date;
+  endedAt: Date | null;
+}

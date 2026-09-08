@@ -42,3 +42,13 @@ export const ZGetTrackersApiQuery = z.object({
   archived: z.enum(["true", "false"]).optional(),
 });
 export type GetTrackersApiQuery = z.infer<typeof ZGetTrackersApiQuery>;
+
+// DEV_NOTE: date is optional — absent means "server's today", which is all the Today screen ever
+// asks for. Explicit dates exist for tests and for a future day-in-review screen.
+export const ZTrackerTimelineApiQuery = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
+export type TrackerTimelineApiQuery = z.infer<typeof ZTrackerTimelineApiQuery>;

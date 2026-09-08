@@ -51,7 +51,7 @@ function makeRequest(path: string, method = "GET", body?: unknown) {
 
 const today = new Date().toISOString().slice(0, 10);
 
-// DEV_NOTE: implementation.md Phase 4's testable unit — "create one entity, link entries from two
+// DEV_NOTE: docs/archive/implementation.md Phase 4's testable unit — "create one entity, link entries from two
 // different trackers/metrics to it via entry_entities, confirm the aggregation endpoint sums both
 // without triple-counting (invariant 6 — filtered by exactly one role)".
 //

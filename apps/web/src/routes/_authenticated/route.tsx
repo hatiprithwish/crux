@@ -1,8 +1,9 @@
 import { createFileRoute, Outlet, Link } from "@tanstack/react-router";
-import { useAuth, UserButton } from "@clerk/tanstack-react-start";
+import { useAuth } from "@clerk/tanstack-react-start";
 import { useEffect, useRef } from "react";
 import { Button } from "@/shadcn/ui/button";
 import { apiClient } from "@/providers/apiClient";
+import { AppSidebar, AppBottomNav } from "@/components/AppSidebar";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -34,61 +35,12 @@ function AuthenticatedLayout() {
   }
 
   return (
-    <div className="min-h-screen">
-      <AppNav />
-      <Outlet />
+    <div className="flex min-h-screen">
+      <AppSidebar />
+      <main className="min-w-0 flex-1 pb-14 md:pb-0">
+        <Outlet />
+      </main>
+      <AppBottomNav />
     </div>
-  );
-}
-
-// DEV_NOTE: every authenticated screen shares this — before it existed, /trackers and /entities were
-// only reachable by typing the URL, which made the read surfaces (heatmap, breakdown, entity rollup)
-// effectively invisible.
-function AppNav() {
-  return (
-    <nav className="border-b">
-      <div className="mx-auto flex max-w-2xl items-center gap-1 px-6 py-3">
-        <Button asChild variant="ghost" size="sm">
-          <Link
-            to="/trackers"
-            activeProps={{ className: "bg-accent text-accent-foreground" }}
-            activeOptions={{ exact: false }}
-          >
-            Today
-          </Link>
-        </Button>
-        <Button asChild variant="ghost" size="sm">
-          <Link
-            to="/entities"
-            activeProps={{ className: "bg-accent text-accent-foreground" }}
-            activeOptions={{ exact: false }}
-          >
-            Entities
-          </Link>
-        </Button>
-        <Button asChild variant="ghost" size="sm">
-          <Link
-            to="/metrics"
-            activeProps={{ className: "bg-accent text-accent-foreground" }}
-            activeOptions={{ exact: false }}
-          >
-            Metrics
-          </Link>
-        </Button>
-        <Button asChild variant="ghost" size="sm">
-          <Link to="/notes" activeProps={{ className: "bg-accent text-accent-foreground" }}>
-            Notes
-          </Link>
-        </Button>
-        <Button asChild variant="ghost" size="sm">
-          <Link to="/archived" activeProps={{ className: "bg-accent text-accent-foreground" }}>
-            Archived
-          </Link>
-        </Button>
-        <div className="ml-auto">
-          <UserButton />
-        </div>
-      </div>
-    </nav>
   );
 }

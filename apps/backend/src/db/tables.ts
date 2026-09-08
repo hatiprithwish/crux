@@ -32,24 +32,6 @@ export const users = table(
   ],
 );
 
-export const notes = table(
-  "notes",
-  {
-    id: t.int().primaryKey({ autoIncrement: true }),
-    publicId: t.text("public_id").notNull(),
-    userId: t.text("user_id").notNull(),
-    title: t.text().notNull(),
-    body: t.text(),
-    status: t.integer().$type<Schemas.NoteStatusIntEnum>().notNull().default(1), // NoteStatusIntEnum.Draft
-    createdAt: t.integer("created_at", { mode: "timestamp" }).notNull(),
-    updatedAt: t.integer("updated_at", { mode: "timestamp" }),
-  },
-  (table) => [
-    t.uniqueIndex("UNQ_notes_public_id").on(table.publicId),
-    t.index("IDX_notes_user_id").on(table.userId),
-  ],
-);
-
 // DEV_NOTE: declared globally per user, reused across trackers — see architecture.md §5 "metrics".
 export const metrics = table(
   "metrics",

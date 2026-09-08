@@ -17,6 +17,7 @@ export class TrackersQueries {
     heatmap: (publicId: string) => ["trackers", publicId, "heatmap"] as const,
     breakdown: (publicId: string) => ["trackers", publicId, "breakdown"] as const,
     running: (publicId: string) => ["trackers", publicId, "running"] as const,
+    timeline: (date: string) => ["trackers", "timeline", date] as const,
   };
 
   static list(withToday: boolean, getToken: () => Promise<string | null>) {
@@ -108,6 +109,20 @@ export class TrackersQueries {
         apiClient<Schemas.GetRunningSessionApiResponse>(`/trackers/${publicId}/running`, getToken, {
           signal,
         }),
+    });
+  }
+
+  // DEV_NOTE: backs the Today screen's ruler — one tick per entry logged today, across every
+  // tracker. See docs/redesign-backlog.md for the read side's cross-tracker DEV_NOTE.
+  static timeline(date: string, getToken: () => Promise<string | null>) {
+    return queryOptions({
+      queryKey: TrackersQueries.keys.timeline(date),
+      queryFn: ({ signal }) =>
+        apiClient<Schemas.GetTrackerTimelineApiResponse>(
+          `/trackers/today/timeline?date=${date}`,
+          getToken,
+          { signal },
+        ),
     });
   }
 }

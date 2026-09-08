@@ -22,7 +22,7 @@ import { CONTROL_LABELS, getTodayLocalDate } from "./-utils";
 
 // DEV_NOTE: this form *is* the manifest engine's front door — everything Phase 0–3 hardcoded per
 // domain (which control, which metric, which schedule) is a field here. Creating "another toggle
-// habit" through it writes no new code anywhere, which is implementation.md Phase 6's acceptance
+// habit" through it writes no new code anywhere, which is docs/archive/implementation.md Phase 6's acceptance
 // test.
 //
 // DEV_NOTE: the form is flat and converted to the nested API shape on submit — same approach as the
@@ -46,7 +46,6 @@ const ZTrackerFormValues = z
     scheduleDays: z.array(z.number().min(0).max(6)),
     scheduleCount: z.number().int().min(1).max(7),
     target: z.string(),
-    step: z.string(),
     compute: z.string(),
     activeFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     metricPublicId: z.string().min(1, "Choose a metric"),
@@ -171,7 +170,6 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
     scheduleDays: [],
     scheduleCount: 3,
     target: "",
-    step: "",
     compute: NO_COMPUTE,
     activeFrom: getTodayLocalDate(),
     metricPublicId: "",
@@ -202,7 +200,7 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
             // invariant so it holds for every caller, not just this form.
             metrics: [],
             target: value.target.trim() === "" ? null : Number(value.target),
-            step: value.step.trim() === "" ? null : Number(value.step),
+            step: null,
             entryMode: value.entryMode,
             schedule,
             compute: value.compute === NO_COMPUTE ? null : Schemas.ZComputeKey.parse(value.compute),
@@ -478,22 +476,6 @@ export function TrackerForm({ onSubmit, onCancel, submitLabel = "Save" }: Tracke
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-              </Field>
-            )}
-          </form.Field>
-
-          <form.Field name="step">
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor={field.name}>Step (optional)</FieldLabel>
-                <Input
-                  id={field.name}
-                  type="number"
-                  step="any"
-                  value={field.state.value}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  onBlur={field.handleBlur}
-                />
               </Field>
             )}
           </form.Field>

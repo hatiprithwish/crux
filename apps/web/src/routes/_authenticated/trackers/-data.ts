@@ -146,6 +146,35 @@ export function useCreateTracker() {
   });
 }
 
+// DEV_NOTE: the response carries the updated tracker, so the detail cache is written from it
+// rather than left showing the pre-edit row until a refetch lands. The list is invalidated on top
+// of that — keys.all() is a prefix of every per-tracker key, and today's totals and streaks are
+// re-derived server-side from a changed schedule or target, so they have to come back from the API.
+export function useUpdateTracker() {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ publicId, body }: { publicId: string; body: Schemas.UpdateTrackerApiRequest }) =>
+      apiClient<Schemas.UpdateTrackerApiResponse>(`/trackers/${publicId}`, getToken, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: async (response, { publicId }) => {
+      if (response.tracker) {
+        queryClient.setQueryData<Schemas.GetTrackerApiResponse>(
+          TrackersQueries.keys.detail(publicId),
+          { isSuccess: true, message: response.message, tracker: response.tracker },
+        );
+      }
+      await queryClient.invalidateQueries({ queryKey: TrackersQueries.keys.all() });
+    },
+    onError: () => {
+      toast.error("Failed to update tracker. Please try again.");
+    },
+  });
+}
+
 // DEV_NOTE: one mutation for all seven controls — the payload is the discriminated union the
 // backend's ControlHandlers dispatches on, so a new control needs a widget and a handler, not a new
 // endpoint or a new hook.

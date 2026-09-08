@@ -68,6 +68,73 @@ export default class TrackersDAL {
     return response;
   }
 
+  // DEV_NOTE: partial by construction, like EntitiesDAL.updateEntity — only the fields the caller
+  // sent are written, so renaming a tracker can't blank an icon the form never showed. The manifest
+  // arrives whole (the Repo merges it onto the stored one), because manifest_json is a single
+  // column: a partial write here would drop control/metrics/compute.
+  async updateTracker(params: {
+    userId: string;
+    publicId: string;
+    fields: {
+      name?: string;
+      icon?: string | null;
+      colorIndex?: number | null;
+      manifest?: Schemas.TrackerManifest;
+      sortOrder?: number;
+      activeFrom?: string;
+    };
+  }) {
+    const response: Schemas.ApiResponse & { tracker?: Schemas.Tracker } = { isSuccess: false };
+
+    try {
+      const { manifest, ...columns } = params.fields;
+      const trackerResponse = await this.db
+        .update(trackers)
+        .set({
+          ...columns,
+          ...(manifest ? { manifestJson: manifest } : {}),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(trackers.publicId, params.publicId),
+            eq(trackers.userId, params.userId),
+            isNull(trackers.deletedAt),
+          ),
+        )
+        .returning()
+        .get();
+
+      if (!trackerResponse) {
+        const message = "Tracker not found";
+        AppLogger.error({
+          category: Schemas.LogCategory.DAL,
+          action: Schemas.LogAction.UpdateTracker,
+          message,
+          metadata: params,
+        });
+        response.message = message;
+        return response;
+      }
+
+      response.isSuccess = true;
+      response.message = "Tracker updated successfully";
+      response.tracker = this.toTracker(trackerResponse);
+    } catch (error) {
+      const message = "Unknown error in updating tracker";
+      AppLogger.error({
+        category: Schemas.LogCategory.DAL,
+        action: Schemas.LogAction.UpdateTracker,
+        message,
+        error,
+        metadata: params,
+      });
+      response.message = message;
+    }
+
+    return response;
+  }
+
   async getTracker(params: { userId: string; publicId: string }) {
     const response: Schemas.ApiResponse & { tracker?: Schemas.Tracker } = { isSuccess: false };
 

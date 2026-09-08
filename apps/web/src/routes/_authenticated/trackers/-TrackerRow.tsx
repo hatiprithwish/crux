@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { DotsThree, Archive } from "@phosphor-icons/react";
+import { DotsThree, Archive, PencilSimple } from "@phosphor-icons/react";
 import { Button } from "@/shadcn/ui/button";
 import { cn } from "@/utils/tailwind";
 import {
@@ -87,6 +87,12 @@ export default function TrackerRow({ today }: TrackerRowProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <Link to="/trackers/$trackerId/edit" params={{ trackerId: tracker.publicId }}>
+                <PencilSimple className="size-4" />
+                Edit
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem
               variant="destructive"
               disabled={archiveTracker.isPending}

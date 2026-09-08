@@ -40,6 +40,7 @@ export enum LogAction {
   CreateTracker = "CreateTracker",
   GetTrackerDetails = "GetTrackerDetails",
   GetTrackers = "GetTrackers",
+  UpdateTracker = "UpdateTracker",
   ArchiveTracker = "ArchiveTracker",
   UnarchiveTracker = "UnarchiveTracker",
   DeleteTracker = "DeleteTracker",

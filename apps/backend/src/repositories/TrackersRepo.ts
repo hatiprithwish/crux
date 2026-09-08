@@ -244,6 +244,56 @@ export default class TrackersRepo {
     };
   }
 
+  // --- update ----------------------------------------------------------------------------------
+
+  // DEV_NOTE: the manifest is merged onto the stored one rather than replacing it, which is what
+  // keeps control / metrics / compute out of a client's reach (ZUpdateTrackerApiRequest can't even
+  // name them). An edit therefore changes how a tracker is scheduled and scored, never how its
+  // history is interpreted: the entries already written stay attached to the same primary metric,
+  // shaped by the same control.
+  async updateTracker(
+    params: Schemas.UpdateTrackerApiRequest & { userId: string; publicId: string },
+  ): Promise<Schemas.UpdateTrackerApiResponse> {
+    const existing = await this.trackersDal.getTracker({
+      userId: params.userId,
+      publicId: params.publicId,
+    });
+    if (!existing.isSuccess || !existing.tracker) {
+      return { isSuccess: false, message: existing.message };
+    }
+
+    const { manifest: manifestPatch, ...columns } = params.tracker;
+    const manifest = manifestPatch ? { ...existing.tracker.manifest, ...manifestPatch } : undefined;
+
+    // DEV_NOTE: re-validated even though control and compute can't be edited — the pairing is the
+    // invariant, and a stored manifest that no longer satisfies it (a compute module retired
+    // between create and edit) should fail here rather than be written forward untouched.
+    if (manifest) {
+      const computeCheck = validateComputeManifest(manifest);
+      if (!computeCheck.isSuccess) {
+        return { isSuccess: false, message: computeCheck.message };
+      }
+    }
+
+    const updated = await this.trackersDal.updateTracker({
+      userId: params.userId,
+      publicId: params.publicId,
+      fields: { ...columns, ...(manifest ? { manifest } : {}) },
+    });
+    if (!updated.isSuccess || !updated.tracker) {
+      return { isSuccess: false, message: updated.message };
+    }
+
+    const metrics = await this.loadMetrics(params.userId);
+    if (!metrics) return { isSuccess: false, message: "Failed to load metrics" };
+
+    return {
+      isSuccess: true,
+      message: "Tracker updated successfully",
+      tracker: this.toTrackerApiShape(updated.tracker, metrics),
+    };
+  }
+
   // --- read ------------------------------------------------------------------------------------
 
   async getTrackers(params: {

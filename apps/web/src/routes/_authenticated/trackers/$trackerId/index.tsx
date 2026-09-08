@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/tanstack-react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shadcn/ui/card";
@@ -63,9 +63,16 @@ function TrackerDetailPage() {
             {tracker.manifest.target !== null ? ` · target ${tracker.manifest.target}` : ""}
           </span>
         </div>
-        <Button variant="outline" onClick={() => navigate({ to: "/trackers" })}>
-          Back
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/trackers/$trackerId/edit" params={{ trackerId }}>
+              Edit
+            </Link>
+          </Button>
+          <Button variant="outline" onClick={() => navigate({ to: "/trackers" })}>
+            Back
+          </Button>
+        </div>
       </div>
 
       <Card>

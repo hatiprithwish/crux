@@ -17,6 +17,12 @@ export interface GetTrackerApiResponse extends ApiResponse {
   tracker?: TrackerApiShape;
 }
 
+// DEV_NOTE: answers with the updated row for the same reason create and unarchive do — the client
+// swaps it into its cache instead of refetching to find out what it just wrote.
+export interface UpdateTrackerApiResponse extends ApiResponse {
+  tracker?: TrackerApiShape;
+}
+
 // DEV_NOTE: `today` is populated only when the caller asked for it (?withToday=true); `trackers` is
 // always present on success, so a list view never has to unwrap the heavier shape.
 export interface GetTrackersApiResponse extends ApiResponse {

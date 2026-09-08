@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { ZQuickAddPayload, ZTrackerBase, ZTrackerMetricSpec } from "./TrackersCommon";
+import {
+  ZQuickAddPayload,
+  ZTrackerBase,
+  ZTrackerManifest,
+  ZTrackerMetricSpec,
+} from "./TrackersCommon";
 import { ZComputeInput } from "./ComputeCommon";
 import { ZEntryRole } from "../core/DomainEnums";
 
@@ -11,6 +16,37 @@ export const ZCreateTrackerApiRequest = z.object({
   metric: ZTrackerMetricSpec,
 });
 export type CreateTrackerApiRequest = z.infer<typeof ZCreateTrackerApiRequest>;
+
+// DEV_NOTE: editing is deliberately narrower than creating, and the omissions are the whole point.
+// `control`, `compute` and `metrics` are absent — and so is the `metric` spec create takes: every
+// entry already written was shaped by the tracker's control and points at its primary metric, so
+// swapping either reinterprets history rather than editing the tracker. Same reasoning that keeps
+// `kind` out of ZUpdateEntityApiRequest.
+// DEV_NOTE: strict, like the wrapper below — an edit naming `control` is a request to reinterpret
+// history, and stripping the key silently would answer it with a 200 that changed nothing.
+export const ZUpdateTrackerManifest = ZTrackerManifest.pick({
+  target: true,
+  step: true,
+  entryMode: true,
+  schedule: true,
+})
+  .partial()
+  .strict();
+export type UpdateTrackerManifest = z.infer<typeof ZUpdateTrackerManifest>;
+
+// DEV_NOTE: `activeTo` is absent because archive/unarchive own that column (TrackersDAL sets and
+// clears it in pairs with archivedAt) — an edit writing it directly would render a live tracker's
+// heatmap dead without archiving it.
+export const ZUpdateTrackerApiRequest = z.object({
+  tracker: ZTrackerBase.omit({ manifest: true, activeTo: true })
+    .partial()
+    .extend({ manifest: ZUpdateTrackerManifest.optional() })
+    .strict()
+    .refine((tracker) => Object.keys(tracker).length > 0, {
+      message: "Provide at least one field to update",
+    }),
+});
+export type UpdateTrackerApiRequest = z.infer<typeof ZUpdateTrackerApiRequest>;
 
 export const ZQuickAddApiRequest = z.object({
   payload: ZQuickAddPayload,

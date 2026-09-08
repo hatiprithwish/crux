@@ -23,6 +23,8 @@ import { MetricsQueries } from "../metrics/-data";
 import { IconPicker } from "./-IconPicker";
 import { TrackerPreview } from "./-TrackerPreview";
 import {
+  AGG_HELP,
+  AGG_HINTS,
   AGG_LABELS,
   CONTROL_TILES,
   DIRECTION_HELP,
@@ -906,7 +908,12 @@ export function TrackerForm({
                         <form.Field name="defaultAgg">
                           {(field) => (
                             <div className="flex flex-col gap-2">
-                              <FieldLabelText htmlFor={field.name}>Aggregation</FieldLabelText>
+                              <div className="flex items-center gap-1.5">
+                                <FieldLabelText htmlFor={field.name}>Aggregation</FieldLabelText>
+                                <InfoHint label="Why aggregation belongs to the metric">
+                                  {AGG_HELP}
+                                </InfoHint>
+                              </div>
                               <Select
                                 value={field.state.value}
                                 onValueChange={(value) =>
@@ -926,6 +933,9 @@ export function TrackerForm({
                                   </SelectGroup>
                                 </SelectContent>
                               </Select>
+                              <p className="text-xs text-muted-foreground">
+                                {AGG_HINTS[field.state.value]}
+                              </p>
                             </div>
                           )}
                         </form.Field>

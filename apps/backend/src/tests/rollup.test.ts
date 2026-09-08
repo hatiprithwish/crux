@@ -267,6 +267,58 @@ describe("Cross-domain rollup (architecture.md §6)", () => {
     expect(otherBody.rollup.metrics).toHaveLength(0);
   });
 
+  // DEV_NOTE: a rollup applies each metric's own default_agg across the range, so a sum metric
+  // reports a total and an avg metric reports a mean — and the mean is weighted by readings
+  // (SUM(sum)/SUM(count)), never an average of the daily averages, which would weight a day with
+  // one reading the same as a day with twenty.
+  it("reports each metric's own aggregation over the range, and refuses to combine two that disagree", async () => {
+    const avgTrackerPublicId = await createTracker(`Weigh-in ${runSuffix}`, incrementManifest(10), {
+      mode: "new" as const,
+      metric: {
+        key: `rollup_avg_${runSuffix}`,
+        name: "Weigh-in",
+        semanticType: "count" as const,
+        canonicalUnit: "count",
+        defaultAgg: "avg" as const,
+        defaultDirection: "higher_better" as const,
+        dateAttribution: "start" as const,
+      },
+    });
+
+    // Two taps of 10 on an averaged metric: sum 20, count 2, so the value is 10 — not 20.
+    for (let tap = 0; tap < 2; tap++) {
+      await logTo(avgTrackerPublicId, [{ entityPublicId: fitnessEntityPublicId, role: "project" }]);
+    }
+
+    const res = await getRollup(`from=${logDate}&to=${logDate}`);
+    const body = (await res.json()) as {
+      rollup: {
+        metrics: { metricKey: string; value: number | null; sum: number; count: number }[];
+        combined: unknown | null;
+      };
+    };
+
+    const avgRow = body.rollup.metrics.find((row) => row.metricKey === `rollup_avg_${runSuffix}`);
+    expect(avgRow?.sum).toBe(20);
+    expect(avgRow?.count).toBe(2);
+    expect(avgRow?.value).toBe(10);
+
+    const sumRow = body.rollup.metrics.find(
+      (row) => row.metricKey === `rollup_pushups_${runSuffix}`,
+    );
+    expect(sumRow?.value).toBe(sumRow?.sum);
+
+    // Same semantic type and unit as the count metrics above, but a different aggregation — adding
+    // one metric's total to another's mean is meaningless, so nothing is combined.
+    expect(body.rollup.combined).toBe(null);
+
+    await worker.fetch(
+      makeRequest(`/trackers/${avgTrackerPublicId}`, "DELETE"),
+      testEnv,
+      createExecutionContext(),
+    );
+  }, 60_000);
+
   it("a window with nothing attributed reports no metrics, not zeros (invariant 7)", async () => {
     const res = await getRollup("from=2020-01-01&to=2020-01-31");
     const body = (await res.json()) as {

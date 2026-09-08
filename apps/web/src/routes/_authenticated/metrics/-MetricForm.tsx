@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/shadcn/ui/select";
 import * as Schemas from "@app/schemas";
-import { UNIT_FOR_SEMANTIC_TYPE, UNIT_PLACEHOLDER } from "../trackers/-utils";
+import { AGG_HINTS, UNIT_FOR_SEMANTIC_TYPE, UNIT_PLACEHOLDER } from "../trackers/-utils";
 
 // DEV_NOTE: one form for both paths, with `lockImmutable` deciding which half is editable. On the
 // edit path key/semanticType/canonicalUnit/dateAttribution render disabled rather than hidden —
@@ -43,7 +43,6 @@ const SEMANTIC_TYPE_LABELS: Record<Schemas.SemanticType, string> = {
 const DEFAULT_AGG_LABELS: Record<Schemas.DefaultAgg, string> = {
   sum: "Sum",
   avg: "Average",
-  last: "Last value",
   max: "Maximum",
   min: "Minimum",
 };
@@ -231,6 +230,11 @@ export function MetricForm({
                 </SelectGroup>
               </SelectContent>
             </Select>
+            {/* DEV_NOTE: unlike direction, this one really is the metric's to own — every tracker
+                writing it has to agree or their numbers can't roll into a single figure. */}
+            <span className="text-xs text-muted-foreground">
+              {AGG_HINTS[field.state.value]} Shared by every tracker on this metric.
+            </span>
           </Field>
         )}
       </form.Field>

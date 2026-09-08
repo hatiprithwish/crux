@@ -581,6 +581,91 @@ describe("Trackers — numeric controls", () => {
   });
 });
 
+// DEV_NOTE: metrics.default_agg decides what one day of a quantity *is*, and every read path used
+// to ignore it and take the sum — so an averaged metric reported a total. Two weigh-ins of 20 and
+// 40 are an average of 30, not a 60 that exists nowhere. This asserts the day's number, the number
+// a quick-add answers with, and the day's score against a target, since all three read it.
+describe("Trackers — metric aggregation", () => {
+  let avgPublicId: string;
+  const avgDate = "2026-06-01";
+
+  beforeAll(async () => {
+    const tracker = await createTracker({
+      tracker: {
+        name: "Body Weight",
+        manifest: {
+          control: "stepper",
+          metrics: [],
+          // 50 sits between the average (30) and the sum (60), so the day's state says which of
+          // the two the scoring path actually read.
+          target: 50,
+          step: 1,
+          direction: "higher_better",
+          entryMode: "retro",
+          schedule: { type: "daily" },
+          compute: null,
+        },
+        activeFrom: "2026-01-01",
+      },
+      metric: {
+        mode: "new" as const,
+        metric: {
+          key: `agg_avg_${Date.now()}`,
+          name: "Body Weight",
+          semanticType: "mass_grams" as const,
+          canonicalUnit: "grams",
+          defaultAgg: "avg" as const,
+          defaultDirection: "higher_better" as const,
+          dateAttribution: "start" as const,
+        },
+      },
+    });
+    avgPublicId = tracker.publicId;
+  });
+
+  afterAll(async () => {
+    await archiveTracker(avgPublicId);
+  });
+
+  it("reports the day's average rather than its sum", async () => {
+    let lastBody: { todaySum: number | null } = { todaySum: null };
+    for (const steps of [20, 40]) {
+      const res = await worker.fetch(
+        makeRequest(`/trackers/${avgPublicId}/entries`, "POST", {
+          payload: { control: "stepper", date: avgDate, steps },
+        }),
+        testEnv,
+        createExecutionContext(),
+      );
+      expect(res.status).toBe(201);
+      lastBody = (await res.json()) as { todaySum: number | null };
+    }
+
+    // The quick-add response is what the widget re-renders off, so it has to agree with the list.
+    expect(lastBody.todaySum).toBe(30);
+
+    const res = await worker.fetch(
+      makeRequest(`/trackers/${avgPublicId}/heatmap?from=${avgDate}&to=${avgDate}`),
+      testEnv,
+      createExecutionContext(),
+    );
+    const body = (await res.json()) as { days: { localDate: string; sum: number | null }[] };
+    const day = body.days.find((entry) => entry.localDate === avgDate);
+    expect(day?.sum).toBe(30);
+  });
+
+  it("scores the day against the target using the aggregated value", async () => {
+    const res = await worker.fetch(
+      makeRequest(`/trackers/${avgPublicId}/heatmap?from=${avgDate}&to=${avgDate}`),
+      testEnv,
+      createExecutionContext(),
+    );
+    const body = (await res.json()) as { days: { localDate: string; state: string }[] };
+    // avg 30 is short of the target of 50 — had it read the sum of 60, this would say "met".
+    expect(body.days.find((day) => day.localDate === avgDate)?.state).toBe("partial");
+  });
+});
+
 // DEV_NOTE: direction lives on the manifest, not on the metric — the same `minutes` metric can be
 // a floor for one tracker and a ceiling for another, which is unrepresentable while one global
 // metric owns the answer. These are the two halves of that: a tracker scoring downwards, and a

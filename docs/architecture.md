@@ -59,7 +59,17 @@ semantic_type    duration_seconds | count | currency_minor | mass_grams |
                  volume_ml | energy_kcal | distance_m | rating_1_5 |
                  boolean | text | json
 
-default_agg      sum | avg | last | max | min
+default_agg      sum | avg | max | min
+                 -- what one day of the quantity means when a day holds several
+                 --   readings. Reps add up; three weigh-ins are not three times a
+                 --   body weight. Stays on the metric — every tracker writing it must
+                 --   agree, or their numbers cannot roll into one.
+                 -- all four roll up from the day grain, which is why week/month/year
+                 --   need no second cache: sum/min/max compose directly, avg is
+                 --   recomputed as SUM(sum)/SUM(count) rather than averaged again.
+                 -- no `last`: daily_facts holds sum/count/min/max/avg and nothing that
+                 --   could answer it. The daily_total control covers the case — it
+                 --   replaces the day, so the day's sum is its last value.
 
 direction        higher_better | lower_better | neutral
                  -- lives on the tracker's manifest: it is a judgement about a habit,
@@ -402,6 +412,11 @@ create table daily_facts (
 Entity-scoped fact rows are **filtered, never summed across** — summing them
 triple-counts any entry linked to three entities. The `entity_id IS NULL` row is the
 canonical total.
+
+All five aggregates are computed on every write, regardless of the metric's
+`default_agg`; the metric decides which one is _read_, in one place
+(`manifest/Aggregation.ts`). Day is the only stored grain — week, month and year are
+rollups of these rows, not caches of their own.
 
 ### Indexes
 

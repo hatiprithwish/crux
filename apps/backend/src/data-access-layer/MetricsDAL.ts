@@ -100,6 +100,44 @@ export default class MetricsDAL {
     return response;
   }
 
+  // DEV_NOTE: by internal id, which every tracker already holds as primary_metric_id — the one
+  // lookup shape a Repo needs when it has a tracker in hand and wants the metric's default_agg
+  // without paying for the user's whole metric list. Still scoped by user_id: the id came from a
+  // row this user owns, and the extra predicate is what keeps that true if it ever doesn't.
+  async getMetricById(params: Schemas.FindMetricByIdDALRequest) {
+    const response: Schemas.ApiResponse & { metric?: Schemas.Metric } = { isSuccess: false };
+
+    try {
+      const [metric] = await this.db
+        .select()
+        .from(metrics)
+        .where(
+          and(
+            eq(metrics.id, params.id),
+            eq(metrics.userId, params.userId),
+            isNull(metrics.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      response.isSuccess = true;
+      response.message = metric ? "Metric fetched successfully" : "Metric not found";
+      response.metric = metric;
+    } catch (error) {
+      const message = "Unknown error in fetching metric by id";
+      AppLogger.error({
+        category: Schemas.LogCategory.DAL,
+        action: Schemas.LogAction.GetMetricDetails,
+        message,
+        error,
+        metadata: params,
+      });
+      response.message = message;
+    }
+
+    return response;
+  }
+
   // DEV_NOTE: metrics are unique per (user_id, key) — the get-or-create lookup domain Repos use
   // before writing an entry, so they never race-create a duplicate metric for the same key.
   async getMetricByKey(params: Schemas.FindMetricByKeyDALRequest) {

@@ -1,0 +1,11 @@
+-- `last` is gone from default_agg (ZDefaultAgg). daily_facts stores sum/count/min/max/avg and has
+-- no column that could answer "the last value of the day" — it depends on entry ordering the fact
+-- row discards — so every read path was already serving the sum for these metrics. This makes the
+-- stored value agree with the behaviour instead of describing one nothing implemented. The
+-- daily_total control covers the case the option was for: it replaces the day rather than appending
+-- to it, so the day's sum *is* its last value.
+--
+-- DEV_NOTE: data-only, so drizzle-kit generates nothing for it — the schema is unchanged and
+-- default_agg is a text column typed only in TypeScript. Its journal entry and snapshot are
+-- hand-written copies of 0004's state, which keeps drizzle numbering from colliding with this file.
+UPDATE `metrics` SET `default_agg` = 'sum' WHERE `default_agg` = 'last';

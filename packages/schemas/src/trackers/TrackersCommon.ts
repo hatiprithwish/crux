@@ -236,6 +236,9 @@ export type TrackerDayState = "not_active" | "not_scheduled" | "no_data" | "part
 export interface TrackerHeatmapDay {
   localDate: string;
   state: TrackerDayState;
+  // DEV_NOTE: named `sum` for the common case, but it holds whatever the metric's defaultAgg says
+  // the day's number is (Aggregation.factValue) — an averaged metric puts its mean here. `state`
+  // was scored against this same value, so the two can't disagree.
   sum: number | null;
   target: number | null;
 }

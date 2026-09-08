@@ -206,9 +206,24 @@ export const DIRECTION_HELP =
 export const AGG_LABELS: Record<Schemas.DefaultAgg, string> = {
   sum: "summed per day",
   avg: "averaged per day",
-  last: "last value of the day",
   max: "highest of the day",
   min: "lowest of the day",
+};
+
+// DEV_NOTE: which aggregation to pick is a question about the quantity, not about the habit, and
+// the wrong answer is silently wrong rather than an error — summing three weigh-ins reports three
+// times a body weight. Shown under the Info icon beside the field.
+export const AGG_HELP =
+  "Aggregation is what one day's number means when a day holds several readings — and it belongs to " +
+  "the metric, not this tracker, because it's a fact about the quantity. Reps add up, so pushups are " +
+  "summed. Body weight doesn't: three weigh-ins aren't three times your weight, so it's averaged. " +
+  "Every tracker writing this metric has to agree, or their numbers can't roll into one.";
+
+export const AGG_HINTS: Record<Schemas.DefaultAgg, string> = {
+  sum: "Readings add up. Right for anything countable — reps, pages, minutes, money.",
+  avg: "The day's mean. Right for a measurement you take, not accumulate — weight, mood, a rating.",
+  max: "The day's highest reading. Right for a personal best.",
+  min: "The day's lowest reading. Right for a floor you're watching — a resting heart rate.",
 };
 
 // DEV_NOTE: "Today · 4 Sep 2026" in the design — the word matters more than the date, so the label

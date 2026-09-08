@@ -29,6 +29,11 @@ export type EntityRollupQuery = z.infer<typeof ZEntityRollupQuery>;
 
 // API response shape — one row per metric attributed to the entity. Metric metadata travels with the
 // number because a bare sum is unreadable without its unit and direction (is 4000 good or bad?).
+// DEV_NOTE: `value` is the number to render — the metric's own defaultAgg applied across the range,
+// so an "averaged per day" metric reports its mean rather than a total nobody asked for. `sum` and
+// `count` stay because they are what `value` was derived from: a client showing "82.4 kg · 14
+// readings" needs both, and a combined total has to re-derive a weighted mean from them rather than
+// averaging the per-metric averages.
 export interface EntityRollupMetricRow {
   metricPublicId: string;
   metricKey: string;
@@ -37,6 +42,7 @@ export interface EntityRollupMetricRow {
   canonicalUnit: string;
   defaultAgg: DefaultAgg;
   direction: Direction;
+  value: number | null;
   sum: number;
   count: number;
 }
@@ -46,9 +52,17 @@ export interface EntityRollupMetricRow {
 // explicit that canonical units are what's stored. Two count metrics (pushups + squats) do combine,
 // which is the doc's own "Fitness number" example; a count and a distance do not, and the client
 // renders the per-metric rows instead of inventing a total.
+//
+// DEV_NOTE: agreeing on defaultAgg is part of that test now. Summing one metric's total with
+// another's average is the same category of error as adding reps to metres — it just doesn't look
+// like one, because both halves are numbers in the same unit. `value` carries the shared
+// aggregation applied across every contributing metric (a weighted mean for avg, not a mean of
+// means), and `defaultAgg` says which one it is so a client can label it.
 export interface EntityRollupCombined {
   semanticType: SemanticType;
   canonicalUnit: string;
+  defaultAgg: DefaultAgg;
+  value: number | null;
   sum: number;
   count: number;
 }

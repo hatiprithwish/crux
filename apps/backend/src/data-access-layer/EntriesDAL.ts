@@ -653,8 +653,20 @@ export default class EntriesDAL {
     dateTo: string;
     role?: Schemas.EntryRole;
   }) {
+    // DEV_NOTE: min/max travel alongside sum/count so the Repo can apply each metric's own
+    // default_agg over the range (Aggregation.rangeValue) instead of every metric being totalled.
+    // Both are composable out of the day grain — MIN of the daily minimums is the range's minimum —
+    // which is why the week/month/year views need no second cache (architecture.md §1). `avg` is
+    // deliberately absent: averaging the daily averages would weight a day with one reading equally
+    // with a day of twenty, so the Repo derives it as sum/count instead.
     const response: Schemas.ApiResponse & {
-      rows?: { metricId: number; sum: number; count: number }[];
+      rows?: {
+        metricId: number;
+        sum: number;
+        count: number;
+        min: number | null;
+        max: number | null;
+      }[];
     } = { isSuccess: false };
 
     try {
@@ -666,6 +678,8 @@ export default class EntriesDAL {
               metricId: entryValues.metricId,
               sum: sql<number>`COALESCE(SUM(${amount}), 0)`.mapWith(Number),
               count: sql<number>`COUNT(*)`.mapWith(Number),
+              min: sql<number | null>`MIN(${amount})`,
+              max: sql<number | null>`MAX(${amount})`,
             })
             .from(entryValues)
             .innerJoin(entries, eq(entries.id, entryValues.entryId))
@@ -691,6 +705,8 @@ export default class EntriesDAL {
               metricId: dailyFacts.metricId,
               sum: sql<number>`COALESCE(SUM(${dailyFacts.sum}), 0)`.mapWith(Number),
               count: sql<number>`COALESCE(SUM(${dailyFacts.count}), 0)`.mapWith(Number),
+              min: sql<number | null>`MIN(${dailyFacts.min})`,
+              max: sql<number | null>`MAX(${dailyFacts.max})`,
             })
             .from(dailyFacts)
             .where(

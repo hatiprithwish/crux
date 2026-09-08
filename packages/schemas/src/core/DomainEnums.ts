@@ -19,7 +19,17 @@ export const ZSemanticType = z.enum([
 ]);
 export type SemanticType = z.infer<typeof ZSemanticType>;
 
-export const ZDefaultAgg = z.enum(["sum", "avg", "last", "max", "min"]);
+// DEV_NOTE: no `last`. daily_facts stores sum/count/min/max/avg and nothing else, so a "last value
+// of the day" was a choice the cache could not answer — it depends on entry ordering the fact row
+// throws away, and every read path silently served the sum instead. The `daily_total` control
+// already covers what it was for: it replaces the day rather than appending to it, so the day's sum
+// *is* its last value. Migration 0004 rewrites the rows that held it.
+//
+// DEV_NOTE: the four that remain all roll up from the day grain, which is what makes one cache
+// enough for week/month/year (architecture.md §1). sum/min/max compose directly; avg does not
+// compose as an average of averages and is recomputed as SUM(sum)/SUM(count), which is only
+// possible because `count` is stored beside it.
+export const ZDefaultAgg = z.enum(["sum", "avg", "max", "min"]);
 export type DefaultAgg = z.infer<typeof ZDefaultAgg>;
 
 export const ZDirection = z.enum(["higher_better", "lower_better", "neutral"]);

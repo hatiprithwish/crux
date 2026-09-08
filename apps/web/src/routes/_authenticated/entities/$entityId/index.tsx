@@ -15,7 +15,7 @@ import {
 import type * as Schemas from "@app/schemas";
 import { EntitiesQueries, useUpdateEntity } from "../-data";
 import { EntityForm } from "../-EntityForm";
-import { addDaysToLocalDate, getTodayLocalDate } from "../../trackers/-utils";
+import { AGG_LABELS, addDaysToLocalDate, getTodayLocalDate } from "../../trackers/-utils";
 
 // DEV_NOTE: architecture.md §6 "Cross-domain aggregation" — the surface where trackers stop
 // mattering. Everything that ever pointed at this entity is here, whichever tracker wrote it: two
@@ -32,6 +32,14 @@ const WINDOW_OPTIONS = [
 ];
 
 const ALL_ROLES = "__all__";
+
+// DEV_NOTE: null is not zero (invariant 7) — a metric whose aggregate was never computed has no
+// value for the range, and an em dash says that where a 0 would claim a reading nobody took.
+// Averages arrive with real decimal tails, so they're trimmed to two places; totals stay exact.
+function formatRollupValue(value: number | null): string {
+  if (value === null) return "—";
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
 
 const ROLE_LABELS: Record<Schemas.EntryRole, string> = {
   project: "As a project",
@@ -178,21 +186,28 @@ function EntityDetailPage() {
             <div className="flex flex-col gap-4">
               {rollup.combined ? (
                 <div className="flex flex-col gap-1">
+                  {/* DEV_NOTE: `value`, not `sum` — the server applies each metric's own
+                      aggregation over the range, so an averaged metric shows its mean here rather
+                      than a total of every reading it holds. */}
                   <span className="text-3xl font-semibold tabular-nums">
-                    {rollup.combined.sum}
+                    {formatRollupValue(rollup.combined.value)}
                     <span className="ml-2 text-base font-normal text-muted-foreground">
                       {rollup.combined.canonicalUnit}
                     </span>
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {rollup.metrics.length} metrics combined · {rollup.combined.count} readings
+                    {rollup.metrics.length} metrics {AGG_LABELS[rollup.combined.defaultAgg]} ·{" "}
+                    {rollup.combined.count} readings
                   </span>
                 </div>
               ) : (
                 // DEV_NOTE: mixed units don't add up — reps plus metres is a meaningless number, so
-                // the server refuses to invent one and the per-metric rows are the answer.
+                // the server refuses to invent one and the per-metric rows are the answer. The same
+                // refusal now covers metrics that disagree on aggregation: one metric's total plus
+                // another's average is the same error wearing a matching unit.
                 <p className="text-xs text-muted-foreground">
-                  These metrics use different units, so they aren&apos;t combined into one number.
+                  These metrics use different units or aggregations, so they aren&apos;t combined
+                  into one number.
                 </p>
               )}
 
@@ -207,7 +222,7 @@ function EntityDetailPage() {
                       <span className="ml-2 text-xs text-muted-foreground">{metric.metricKey}</span>
                     </span>
                     <span className="tabular-nums text-muted-foreground">
-                      {metric.sum} {metric.canonicalUnit} · {metric.count}×
+                      {formatRollupValue(metric.value)} {metric.canonicalUnit} · {metric.count}×
                     </span>
                   </div>
                 ))}

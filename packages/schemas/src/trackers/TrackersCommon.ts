@@ -29,8 +29,13 @@ export const ZTrackerManifest = z.object({
 export type TrackerManifest = z.infer<typeof ZTrackerManifest>;
 
 // Create Tracker Body
+// DEV_NOTE: `icon` is a single emoji chosen from a curated set in the form — presentation only, and
+// nullable because a tracker created through the API has no reason to be forced to pick one. Stored
+// as text rather than an index into a list so the list can be reordered or grown without rewriting
+// rows that already point into it.
 export const ZTrackerBase = z.object({
   name: z.string(),
+  icon: z.string().nullable().optional(),
   colorIndex: z.number().nullable().optional(),
   manifest: ZTrackerManifest,
   sortOrder: z.number().optional(),

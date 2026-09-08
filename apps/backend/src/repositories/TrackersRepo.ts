@@ -223,6 +223,7 @@ export default class TrackersRepo {
       userId: params.userId,
       primaryMetricId: metric.id,
       name: params.tracker.name,
+      icon: params.tracker.icon,
       colorIndex: params.tracker.colorIndex,
       manifest: { ...params.tracker.manifest, metrics: manifestMetrics },
       sortOrder: params.tracker.sortOrder,

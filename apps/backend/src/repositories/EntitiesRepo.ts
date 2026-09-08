@@ -150,6 +150,7 @@ export default class EntitiesRepo {
     userId: string;
     kind?: Schemas.EntityKind;
     archived?: boolean;
+    withStats?: boolean;
   }): Promise<Schemas.GetEntitiesApiResponse> {
     const result = await this.entitiesDal.getEntities(params);
     if (!result.isSuccess || !result.entities) {
@@ -175,7 +176,61 @@ export default class EntitiesRepo {
           entity.parentId === null ? null : (publicIdById.get(entity.parentId) ?? null),
         ),
       ),
+      stats: params.withStats ? await this.buildStats(params.userId, result.entities) : undefined,
     };
+  }
+
+  // DEV_NOTE: the Things screen's usage line. A stats row is emitted for every entity in the list,
+  // including the untouched ones — a zero entry count is a real answer there ("nothing points at
+  // this yet"), unlike a zero *total*, which stays null when no metric ever wrote against it
+  // (invariant 7). Failing to load usage is not failing to load entities: the list still returns,
+  // with no stats attached, because a name list is more useful than an error page.
+  private async buildStats(
+    userId: string,
+    entities: Schemas.Entity[],
+  ): Promise<Schemas.EntityStatsApiShape[] | undefined> {
+    const [usageResult, metricsResult] = await Promise.all([
+      this.entriesDal.getEntityUsage({ userId }),
+      this.metricsDal.getMetrics({ userId }),
+    ]);
+    if (!usageResult.isSuccess || !usageResult.usage || !usageResult.totals) return undefined;
+    if (!metricsResult.isSuccess || !metricsResult.metrics) return undefined;
+
+    const metricById = new Map(metricsResult.metrics.map((metric) => [metric.id, metric]));
+    const usageByEntityId = new Map(usageResult.usage.map((row) => [row.entityId, row]));
+
+    const rowsByEntityId = new Map<number, Schemas.EntityRollupMetricRow[]>();
+    for (const row of usageResult.totals) {
+      const metric = metricById.get(row.metricId);
+      // Same rule as getRollup: a fact row whose metric can't be resolved is dropped, not rendered
+      // nameless. The orphan scan reports it as the repository bug it would be.
+      if (!metric) continue;
+
+      const rows = rowsByEntityId.get(row.entityId) ?? [];
+      rows.push({
+        metricPublicId: metric.publicId,
+        metricKey: metric.key,
+        metricName: metric.name,
+        semanticType: metric.semanticType,
+        canonicalUnit: metric.canonicalUnit,
+        defaultAgg: metric.defaultAgg,
+        direction: metric.defaultDirection,
+        value: rangeValue(row, metric.defaultAgg),
+        sum: row.sum,
+        count: row.count,
+      });
+      rowsByEntityId.set(row.entityId, rows);
+    }
+
+    return entities.map((entity) => ({
+      entityPublicId: entity.publicId,
+      entryCount: usageByEntityId.get(entity.id)?.entryCount ?? 0,
+      lastEntryDate: usageByEntityId.get(entity.id)?.lastEntryDate ?? null,
+      // DEV_NOTE: the rollup's own combine — mixed units or mixed aggregations produce no total
+      // here either, and one rule for "when do these numbers add up" is the only way the row and
+      // the detail screen can't disagree.
+      total: this.combine(rowsByEntityId.get(entity.id) ?? []),
+    }));
   }
 
   async getEntity(params: {

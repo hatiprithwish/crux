@@ -26,6 +26,7 @@ export enum LogAction {
   ArchiveEntity = "ArchiveEntity",
   UnarchiveEntity = "UnarchiveEntity",
   GetEntityRollup = "GetEntityRollup",
+  GetEntityStats = "GetEntityStats",
   DeleteEntity = "DeleteEntity",
 
   // Substrate — metrics

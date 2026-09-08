@@ -4,13 +4,19 @@ import { Input } from "@/shadcn/ui/input";
 import type * as Schemas from "@app/schemas";
 import type { ControlProps } from "./-TrackerRow";
 import { EntityLinkFields } from "./-EntityLinkFields";
-import { formatMinorAmount, getTodayLocalDate } from "./-utils";
+import { formatDayLabel, formatMinorAmount } from "./-utils";
 
 // DEV_NOTE: the expense entry Money used to own. Amount is typed in major units and converted to
 // minor on submit — canonical units are what's stored (invariant 2). fxRate is always sent (1 for
 // home currency), and value_base is computed server-side at write time, never recomputed later
 // (invariant 3).
-export function AmountPadControl({ tracker, today, onQuickAdd, isPending }: ControlProps) {
+export function AmountPadControl({
+  tracker,
+  localDate,
+  daySum,
+  onQuickAdd,
+  isPending,
+}: ControlProps) {
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("INR");
   const [fxRate, setFxRate] = useState("1");
@@ -23,7 +29,7 @@ export function AmountPadControl({ tracker, today, onQuickAdd, isPending }: Cont
 
     onQuickAdd({
       control: "amount_pad",
-      date: getTodayLocalDate(),
+      date: localDate,
       amountMinor: Math.round(major * 100),
       currency: currency.toUpperCase(),
       fxRate: rate,
@@ -35,7 +41,7 @@ export function AmountPadControl({ tracker, today, onQuickAdd, isPending }: Cont
   return (
     <div className="flex flex-col gap-3">
       <span className="text-sm text-muted-foreground">
-        Today: {today?.todaySum != null ? formatMinorAmount(today.todaySum) : "—"}
+        {formatDayLabel(localDate)}: {daySum != null ? formatMinorAmount(daySum) : "—"}
       </span>
 
       <div className="flex items-center gap-2">
@@ -46,7 +52,7 @@ export function AmountPadControl({ tracker, today, onQuickAdd, isPending }: Cont
           value={amount}
           placeholder="Amount"
           className="w-32"
-          aria-label={`Amount for ${tracker.name}`}
+          aria-label={`Amount for ${tracker.name}, ${formatDayLabel(localDate)}`}
           onChange={(event) => setAmount(event.target.value)}
         />
         <Input

@@ -7,8 +7,9 @@ import { formatDuration } from "./-utils";
 // DEV_NOTE: start and stop are two members of one quick-add payload, not two endpoints — the open
 // session comes back on the tracker's today row, so this widget needs no query of its own. Elapsed
 // time ticks client-side; the authoritative duration is written server-side on stop.
-export function TimerControl({ tracker, today, onQuickAdd, isPending }: ControlProps) {
-  const openSession = today?.openSession ?? null;
+// DEV_NOTE: the one control with no date of its own — a session starts now, and ControlHandlers
+// stamps it with the server's clock, so ControlProps.localDate is deliberately unused here.
+export function TimerControl({ tracker, openSession, onQuickAdd, isPending }: ControlProps) {
   const [label, setLabel] = useState("");
   // DEV_NOTE: the ticking clock is state; the elapsed seconds are derived during render, so the
   // effect only ever schedules — it never sets state synchronously on mount (which would cascade a

@@ -17,6 +17,27 @@ export function dayOfWeek(localDate: string): number {
   return new Date(`${localDate}T00:00:00.000Z`).getUTCDay();
 }
 
+// DEV_NOTE: the controls no longer always write today — a heatmap cell hands them an earlier date —
+// so every label that used to read "Today" has to say *which* day it is about. Named days stay
+// named, because "Yesterday" is how a person refers to it and a date would make them work it out.
+export function formatDayLabel(localDate: string): string {
+  const today = getTodayLocalDate();
+  if (localDate === today) return "Today";
+  if (localDate === addDaysToLocalDate(today, -1)) return "Yesterday";
+  return new Date(`${localDate}T00:00:00.000Z`).toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
+// The same day as a phrase inside a sentence — "Done today", "Done on Wed 3 Sep".
+export function formatDayPhrase(localDate: string): string {
+  const label = formatDayLabel(localDate);
+  return label === "Today" || label === "Yesterday" ? label.toLowerCase() : `on ${label}`;
+}
+
 export function formatDuration(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -32,6 +53,26 @@ export function formatDuration(totalSeconds: number): string {
 export function formatMinorAmount(amountMinor: number, currency?: string | null): string {
   const major = (amountMinor / 100).toFixed(2);
   return currency ? `${currency} ${major}` : major;
+}
+
+// DEV_NOTE: the one place a canonical number becomes a readable one, shared by the Things list and
+// the tracker detail screen — seconds read as "3h 20m", currency_minor as an amount, and everything
+// else as the number beside the unit it was measured in. Storage stays canonical (invariant 2);
+// this is presentation, applied as late as possible.
+// DEV_NOTE: a null value is an em dash, never a 0 — nothing was measured (invariant 7).
+export function formatMetricValue(
+  value: number | null,
+  semanticType: Schemas.SemanticType,
+  canonicalUnit: string,
+): string {
+  if (value === null) return "—";
+  if (semanticType === "duration_seconds") return formatDuration(Math.round(value));
+  if (semanticType === "currency_minor") return formatMinorAmount(Math.round(value));
+  // Averages arrive with real decimal tails; totals stay exact.
+  const number = Number.isInteger(value) ? String(value) : value.toFixed(2);
+  // "boolean" as a unit reads as a type name, not a measurement — a summed boolean is a day count.
+  if (semanticType === "boolean") return `${number} ${Number(number) === 1 ? "day" : "days"}`;
+  return `${number} ${canonicalUnit}`;
 }
 
 export const CONTROL_LABELS: Record<Schemas.Control, string> = {

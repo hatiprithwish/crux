@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import getDbClient from "@/db/dbClient";
 import { dailyFacts, entries, entryEntities, entryValues } from "@/db/tables";
@@ -727,6 +727,79 @@ export default class EntriesDAL {
       AppLogger.error({
         category: Schemas.LogCategory.DAL,
         action: Schemas.LogAction.GetEntityRollup,
+        message,
+        error,
+        metadata: params,
+      });
+      response.message = message;
+    }
+
+    return response;
+  }
+
+  // DEV_NOTE: backs the Things screen's per-row usage line (design/things-mobile.png). Two grouped
+  // queries for every entity a user has, not one per row — the screen shows six kinds at once, and a
+  // request per entity is the shape this exists to avoid.
+  //
+  // DEV_NOTE: the counts come off `entries` and the totals off `daily_facts` on purpose. "47 entries"
+  // is a fact about entries, and daily_facts.count counts readings (a four-reading meal is one
+  // entry); the money/time total, meanwhile, is exactly what daily_facts materialises, and the
+  // no-role branch of getEntityRollup already reads it the same way.
+  async getEntityUsage(params: { userId: string }) {
+    const response: Schemas.ApiResponse & {
+      usage?: { entityId: number; entryCount: number; lastEntryDate: string | null }[];
+      totals?: {
+        entityId: number;
+        metricId: number;
+        sum: number;
+        count: number;
+        min: number | null;
+        max: number | null;
+      }[];
+    } = { isSuccess: false };
+
+    try {
+      const [usage, totals] = await Promise.all([
+        // DEV_NOTE: COUNT(DISTINCT), not COUNT(*) — entry_entities' PK is (entry_id, role), so one
+        // entry that names the same entity as both its project and its category is two rows here
+        // and still one entry.
+        this.db
+          .select({
+            entityId: entryEntities.entityId,
+            entryCount: sql<number>`COUNT(DISTINCT ${entries.id})`.mapWith(Number),
+            lastEntryDate: sql<string | null>`MAX(${entries.localDate})`,
+          })
+          .from(entryEntities)
+          .innerJoin(entries, eq(entries.id, entryEntities.entryId))
+          .where(and(eq(entries.userId, params.userId), isNull(entries.deletedAt)))
+          .groupBy(entryEntities.entityId),
+        this.db
+          .select({
+            entityId: dailyFacts.entityId,
+            metricId: dailyFacts.metricId,
+            sum: sql<number>`COALESCE(SUM(${dailyFacts.sum}), 0)`.mapWith(Number),
+            count: sql<number>`COALESCE(SUM(${dailyFacts.count}), 0)`.mapWith(Number),
+            min: sql<number | null>`MIN(${dailyFacts.min})`,
+            max: sql<number | null>`MAX(${dailyFacts.max})`,
+          })
+          .from(dailyFacts)
+          .where(and(eq(dailyFacts.userId, params.userId), isNotNull(dailyFacts.entityId)))
+          .groupBy(dailyFacts.entityId, dailyFacts.metricId),
+      ]);
+
+      response.isSuccess = true;
+      response.message = "Entity usage fetched successfully";
+      response.usage = usage;
+      // The isNotNull filter above is what makes this cast safe — the un-attributed bucket
+      // (entityId IS NULL) is every entry that named no entity at all, which is nobody's row here.
+      response.totals = totals.filter(
+        (row): row is (typeof totals)[number] & { entityId: number } => row.entityId !== null,
+      );
+    } catch (error) {
+      const message = "Unknown error in fetching entity usage";
+      AppLogger.error({
+        category: Schemas.LogCategory.DAL,
+        action: Schemas.LogAction.GetEntityStats,
         message,
         error,
         metadata: params,

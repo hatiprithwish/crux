@@ -881,7 +881,7 @@ export default class TrackersRepo {
       tz: APP_TZ,
       label: planned.label,
       note: planned.note,
-      source: "manual",
+      source: planned.source,
       values,
       entityLinks: links.entityLinks,
     });

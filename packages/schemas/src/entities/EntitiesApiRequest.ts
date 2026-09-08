@@ -30,9 +30,14 @@ export const ZUpdateEntityApiRequest = z.object({
 });
 export type UpdateEntityApiRequest = z.infer<typeof ZUpdateEntityApiRequest>;
 
+// DEV_NOTE: `withStats` mirrors ZGetTrackersApiQuery's `withToday` — the Things screen needs every
+// entity plus three usage facts each, and paying for the aggregate on every list read (the entity
+// pickers in -EntityLinkFields.tsx hit this endpoint five times per form) would be a tax on screens
+// that never render it.
 export const ZGetEntitiesApiQuery = z.object({
   kind: ZEntityKind.optional(),
   archived: z.enum(["true", "false"]).optional(),
+  withStats: z.enum(["true", "false"]).optional(),
 });
 export type GetEntitiesApiQuery = z.infer<typeof ZGetEntitiesApiQuery>;
 

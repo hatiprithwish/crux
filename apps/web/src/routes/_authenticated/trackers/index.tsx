@@ -38,9 +38,14 @@ function TrackersPage() {
     (row) => row.todaySum !== null || row.todayCount > 0 || row.openSession !== null,
   ).length;
 
+  // DEV_NOTE: full-bleed, matching -TrackerForm.tsx and the tracker detail screen. The mockup's
+  // centred sheet is a phone; on a desktop window a max-w-2xl column put the day's list in a strip
+  // with two empty margins wider than the content. The rows run edge to edge instead, and the
+  // right-hand insight panels design/today-web.png shows will drop into the space beside them when
+  // the surface backing them exists (see docs/redesign-backlog.md).
   return (
-    <div className="mx-auto max-w-2xl px-6 py-8">
-      <div className="flex items-start justify-between gap-4">
+    <div className="flex min-h-screen flex-col">
+      <header className="flex items-start justify-between gap-4 border-b border-border px-6 py-8">
         <div className="flex flex-col gap-1">
           <p className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
             {formatTodayLabel(today)}
@@ -54,16 +59,18 @@ function TrackersPage() {
         <Button asChild variant="outline" size="sm">
           <Link to="/trackers/new">New tracker</Link>
         </Button>
+      </header>
+
+      <div className="border-b border-border px-6 py-2">
+        <TrackerTimeline entries={timeline.data?.entries ?? []} />
       </div>
 
-      <TrackerTimeline entries={timeline.data?.entries ?? []} />
-
       {isPending ? (
-        <p className="mt-4 text-muted-foreground">Loading trackers...</p>
+        <p className="px-6 py-5 text-muted-foreground">Loading trackers...</p>
       ) : isError ? (
-        <p className="mt-4 text-destructive">Failed to load trackers.</p>
+        <p className="px-6 py-5 text-destructive">Failed to load trackers.</p>
       ) : trackers.length === 0 ? (
-        <div className="mt-10 flex flex-col gap-4">
+        <div className="flex flex-col gap-4 px-6 py-10">
           <div className="flex flex-col gap-2">
             <h2 className="text-xl font-medium">An empty rule.</h2>
             <h2 className="text-xl font-medium">Put one mark on it.</h2>
@@ -77,7 +84,7 @@ function TrackersPage() {
           </Button>
         </div>
       ) : (
-        <div className="mt-2 flex flex-col">
+        <div className="flex flex-col">
           {todayRows.map((row) => (
             <TrackerRow key={row.tracker.publicId} today={row} />
           ))}

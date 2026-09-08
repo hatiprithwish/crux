@@ -3,12 +3,18 @@ import { Button } from "@/shadcn/ui/button";
 import type * as Schemas from "@app/schemas";
 import type { ControlProps } from "./-TrackerRow";
 import { EntityLinkFields } from "./-EntityLinkFields";
-import { getTodayLocalDate } from "./-utils";
+import { formatDayPhrase } from "./-utils";
 
 // DEV_NOTE: additive — every tap is its own entry, so the day's total is a sum of taps rather than
 // a value being overwritten. That's the difference from daily_total, and it's why the backend plans
 // an "append" here.
-export function IncrementControl({ tracker, today, onQuickAdd, isPending }: ControlProps) {
+export function IncrementControl({
+  tracker,
+  localDate,
+  daySum,
+  onQuickAdd,
+  isPending,
+}: ControlProps) {
   const step = tracker.manifest.step ?? 1;
   const [links, setLinks] = useState<Schemas.EntityLinkInput[]>([]);
 
@@ -16,16 +22,14 @@ export function IncrementControl({ tracker, today, onQuickAdd, isPending }: Cont
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
         <span className="text-sm tabular-nums text-muted-foreground">
-          {today?.todaySum ?? 0}
+          {daySum ?? 0}
           {tracker.manifest.target !== null ? ` / ${tracker.manifest.target}` : ""}
         </span>
         <Button
           size="sm"
           disabled={isPending}
-          onClick={() =>
-            onQuickAdd({ control: "increment", date: getTodayLocalDate(), entityLinks: links })
-          }
-          aria-label={`Add ${step} to ${tracker.name}`}
+          onClick={() => onQuickAdd({ control: "increment", date: localDate, entityLinks: links })}
+          aria-label={`Add ${step} to ${tracker.name} ${formatDayPhrase(localDate)}`}
         >
           +{step}
         </Button>

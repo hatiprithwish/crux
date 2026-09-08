@@ -20,6 +20,10 @@ export type PlannedValue = {
   fxRate?: number | null;
 };
 
+// DEV_NOTE: `source` is decided here rather than in the Repo because this is the only layer that
+// knows both dates — a tap made on the day it happened is "manual", one written against an earlier
+// day (the heatmap's backfill) is "manual_retro". EntriesCommon.ts declares both; without this the
+// column recorded "manual" for every write and could never tell the two apart after the fact.
 export type PlannedEntry = {
   entryKind: Schemas.EntryKind;
   localDate: string;
@@ -27,6 +31,7 @@ export type PlannedEntry = {
   endedAt: Date | null;
   label: string | null;
   note: string | null;
+  source: "manual" | "manual_retro";
   values: PlannedValue[];
   entityLinks: Schemas.EntityLinkInput[];
 };
@@ -88,6 +93,10 @@ export function planQuickAdd(params: {
     return fail("This tracker only accepts entries for today");
   }
 
+  // A timer always writes the present instant, so it is never retroactive.
+  const source =
+    payload.control !== "timer" && payload.date !== todayLocalDate ? "manual_retro" : "manual";
+
   const step = manifest.step ?? 1;
 
   switch (payload.control) {
@@ -107,6 +116,7 @@ export function planQuickAdd(params: {
             endedAt: null,
             label: null,
             note: null,
+            source,
             values: [{ metricKey: primaryMetricKey, valueNum: 1 }],
             entityLinks: payload.entityLinks,
           },
@@ -126,6 +136,7 @@ export function planQuickAdd(params: {
             endedAt: null,
             label: null,
             note: payload.note ?? null,
+            source,
             values: [{ metricKey: primaryMetricKey, valueNum: step }],
             entityLinks: payload.entityLinks,
           },
@@ -146,6 +157,7 @@ export function planQuickAdd(params: {
             endedAt: null,
             label: null,
             note: null,
+            source,
             values: [{ metricKey: primaryMetricKey, valueNum: payload.steps * step }],
             entityLinks: payload.entityLinks,
           },
@@ -166,6 +178,7 @@ export function planQuickAdd(params: {
             endedAt: null,
             label: null,
             note: null,
+            source,
             values: [{ metricKey: primaryMetricKey, valueNum: payload.total }],
             entityLinks: payload.entityLinks,
           },
@@ -185,6 +198,7 @@ export function planQuickAdd(params: {
             endedAt: null,
             label: null,
             note: payload.note ?? null,
+            source,
             values: [
               {
                 metricKey: primaryMetricKey,
@@ -235,6 +249,7 @@ export function planQuickAdd(params: {
             endedAt: null,
             label: payload.label ?? null,
             note: payload.note ?? null,
+            source,
             values,
             entityLinks: payload.entityLinks,
           },
@@ -263,6 +278,7 @@ export function planQuickAdd(params: {
             endedAt: null,
             label: payload.timer.label,
             note: null,
+            source,
             values: [],
             entityLinks: payload.timer.entityLinks,
           },

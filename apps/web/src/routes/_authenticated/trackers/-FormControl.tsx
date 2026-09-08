@@ -5,13 +5,13 @@ import { Field, FieldLabel } from "@/shadcn/ui/field";
 import type * as Schemas from "@app/schemas";
 import type { ControlProps } from "./-TrackerRow";
 import { EntityLinkFields } from "./-EntityLinkFields";
-import { getTodayLocalDate } from "./-utils";
+import { formatDayPhrase } from "./-utils";
 
 // DEV_NOTE: the general case — one input per metric the manifest declares (a meal writes four
 // readings, a workout set two; architecture.md §5 "entry_values"). The manifest is the field list,
 // so a new multi-metric tracker needs no new component. Values the user leaves blank are omitted
 // rather than sent as 0 — invariant 7, missing data is neutral.
-export function FormControl({ tracker, onQuickAdd, isPending }: ControlProps) {
+export function FormControl({ tracker, localDate, onQuickAdd, isPending }: ControlProps) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [label, setLabel] = useState("");
   const [links, setLinks] = useState<Schemas.EntityLinkInput[]>([]);
@@ -29,7 +29,7 @@ export function FormControl({ tracker, onQuickAdd, isPending }: ControlProps) {
 
     onQuickAdd({
       control: "form",
-      date: getTodayLocalDate(),
+      date: localDate,
       values: payloadValues,
       entityLinks: links,
       label: label.trim() === "" ? null : label.trim(),
@@ -78,7 +78,7 @@ export function FormControl({ tracker, onQuickAdd, isPending }: ControlProps) {
 
       <div className="flex justify-end">
         <Button size="sm" disabled={isPending || filled.length === 0} onClick={submit}>
-          Log entry
+          Log entry {formatDayPhrase(localDate)}
         </Button>
       </div>
     </div>

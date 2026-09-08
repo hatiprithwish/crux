@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from "vites
 import { and, eq, isNull } from "drizzle-orm";
 import worker from "../index";
 import getDbClient from "@/db/dbClient";
-import { dailyFacts, trackers } from "@/db/tables";
+import { dailyFacts, entries, trackers } from "@/db/tables";
 // Declare env type for this test suite
 declare module "cloudflare:test" {
   interface ProvidedEnv extends Env {}
@@ -466,6 +466,54 @@ describe("Trackers — entryMode enforcement", () => {
       createExecutionContext(),
     );
     expect(live.status).toBe(201);
+  });
+});
+
+// DEV_NOTE: the heatmap's backfill writes through the same quick-add endpoint as a live tap — what
+// separates the two afterwards is entries.source. Without this the column read "manual" for every
+// row and a day filled in a week later was indistinguishable from one tapped on the day.
+describe("Trackers — backfilled entries record their source", () => {
+  let trackerPublicId: string;
+
+  beforeAll(async () => {
+    const tracker = await createTracker({
+      tracker: { name: "Retro Source Habit", manifest: habitManifest("retro"), activeFrom: today },
+      metric: newMetricSpec("Retro Source Habit"),
+    });
+    trackerPublicId = tracker.publicId;
+  });
+
+  afterAll(async () => {
+    await archiveTracker(trackerPublicId);
+  });
+
+  it("stamps manual_retro on a past date and manual on today", async () => {
+    const past = dayBefore(4);
+
+    for (const date of [past, today]) {
+      const res = await worker.fetch(
+        makeRequest(`/trackers/${trackerPublicId}/entries`, "POST", {
+          payload: { control: "toggle", date, completed: true },
+        }),
+        testEnv,
+        createExecutionContext(),
+      );
+      expect(res.status).toBe(201);
+    }
+
+    const db = getDbClient(testEnv);
+    const [tracker] = await db
+      .select()
+      .from(trackers)
+      .where(eq(trackers.publicId, trackerPublicId));
+
+    const rows = await db
+      .select()
+      .from(entries)
+      .where(and(eq(entries.trackerId, tracker.id), isNull(entries.deletedAt)));
+
+    expect(rows.find((row) => row.localDate === past)?.source).toBe("manual_retro");
+    expect(rows.find((row) => row.localDate === today)?.source).toBe("manual");
   });
 });
 

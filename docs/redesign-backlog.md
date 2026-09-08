@@ -44,6 +44,31 @@ vs. inline focus-jump down the list), then whatever backend support that shape n
 likely still one `useQuickAdd` call per tracker, so this may be purely a frontend
 flow. Left for a follow-up pass once the plain Today screen is live.
 
+## Per-entity attributes on the Things list
+
+`design/things-mobile.png` shows a credit account's row ending in "due 5 Sep" where the other
+rows show their last-entry date. That's a per-entity fact, not a usage statistic: the
+`entity_attrs` table exists for exactly this (a goal's target date, an account's due date) and
+is still read and written by nothing.
+
+The rest of that row shipped — `GET /entities?withStats=true` returns `entryCount`,
+`lastEntryDate` and a combinable `total` per entity (`EntitiesRepo.buildStats`).
+
+**What it needs:** a DAL surface over `entity_attrs`, a decision about which keys are
+first-class enough to render (due date? opening balance?), and a field for them in
+`-EntityForm.tsx`. Until then a row says when it was last used, which is the fact the screen
+was actually missing.
+
+## Currency symbols
+
+`formatMinorAmount` prints "1182.40", not "₹1,18,240" — every currency figure in the app,
+including the Things rows and their net line, is a bare number unless the entry itself carried
+a currency code. `users.home_currency` is stored (defaulting to INR) but no API response
+exposes it, so the client has nothing to format against.
+
+**What it needs:** `home_currency` on the user response, then `Intl.NumberFormat` in
+`formatMinorAmount` instead of a `toFixed(2)`.
+
 ## Per-user timezone
 
 `TrackersRepo`'s `APP_TZ` is hardcoded to `"UTC"` (see its DEV_NOTE) — `entries.tz` is

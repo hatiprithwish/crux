@@ -9,17 +9,38 @@ import { toast } from "sonner";
 export class EntitiesQueries {
   static readonly keys = {
     all: () => ["entities"] as const,
-    list: (kind: Schemas.EntityKind) => ["entities", kind] as const,
+    // DEV_NOTE: kind and withStats are both in the key — "every kind, with usage" (the Things
+    // screen) and "just the accounts" (a picker inside a form) are different responses off the same
+    // endpoint, and they must not share a cache entry.
+    list: (kind: Schemas.EntityKind | undefined, withStats: boolean) =>
+      ["entities", kind ?? "all", withStats] as const,
     archived: () => ["entities", "archived"] as const,
     detail: (publicId: string) => ["entities", "detail", publicId] as const,
     rollup: (publicId: string) => ["entities", "detail", publicId, "rollup"] as const,
   };
 
-  static list(kind: Schemas.EntityKind, getToken: () => Promise<string | null>) {
+  // DEV_NOTE: `kind` is optional so the Things screen can count every kind's tab off one request
+  // instead of six. `withStats` is opt-in for the same reason it is server-side — the entity
+  // pickers inside the tracker forms call this five times per render and need none of it.
+  static list(
+    kind: Schemas.EntityKind | undefined,
+    getToken: () => Promise<string | null>,
+    withStats = false,
+  ) {
+    const query = [kind ? `kind=${kind}` : null, withStats ? "withStats=true" : null]
+      .filter(Boolean)
+      .join("&");
+
     return queryOptions({
-      queryKey: EntitiesQueries.keys.list(kind),
+      queryKey: EntitiesQueries.keys.list(kind, withStats),
       queryFn: ({ signal }) =>
-        apiClient<Schemas.GetEntitiesApiResponse>(`/entities?kind=${kind}`, getToken, { signal }),
+        apiClient<Schemas.GetEntitiesApiResponse>(
+          `/entities${query ? `?${query}` : ""}`,
+          getToken,
+          {
+            signal,
+          },
+        ),
     });
   }
 

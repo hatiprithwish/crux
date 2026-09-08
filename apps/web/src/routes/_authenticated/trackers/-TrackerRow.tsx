@@ -17,14 +17,23 @@ import { DailyTotalControl } from "./-DailyTotalControl";
 import { TimerControl } from "./-TimerControl";
 import { AmountPadControl } from "./-AmountPadControl";
 import { FormControl } from "./-FormControl";
-import { describeSchedule } from "./-utils";
+import { describeSchedule, getTodayLocalDate } from "./-utils";
 
 // DEV_NOTE: architecture.md §6 — "One TrackerRow component, five child controls" (seven, as it
 // turned out). This is the whole of the frontend's per-domain knowledge: a switch on
 // manifest.control. Adding a habit, an expense tracker or a timer needs no new component.
+//
+// DEV_NOTE: the props name a *day*, not "today" — the same seven controls write the row's own day
+// here and an earlier one from the heatmap's backfill panel (-TrackerBackfillPanel.tsx). Taking a
+// TrackerTodayApiShape instead would make every control reach through a shape that only the Today
+// screen can produce, and the backfill panel would have to forge one.
 export interface ControlProps {
   tracker: Schemas.TrackerApiShape;
-  today: Schemas.TrackerTodayApiShape | null;
+  // The date every payload this control sends is written against.
+  localDate: string;
+  daySum: number | null; // null = nothing logged that day (invariant 7 — never coalesced to 0)
+  dayCount: number;
+  openSession: Schemas.TrackerEntryApiShape | null; // timer trackers only
   onQuickAdd: (payload: Schemas.QuickAddPayload) => void;
   isPending: boolean;
 }
@@ -40,7 +49,10 @@ export default function TrackerRow({ today }: TrackerRowProps) {
 
   const controlProps: ControlProps = {
     tracker,
-    today,
+    localDate: getTodayLocalDate(),
+    daySum: today.todaySum,
+    dayCount: today.todayCount,
+    openSession: today.openSession,
     isPending: quickAdd.isPending,
     onQuickAdd: (payload) => quickAdd.mutate({ publicId: tracker.publicId, payload }),
   };
@@ -50,8 +62,10 @@ export default function TrackerRow({ today }: TrackerRowProps) {
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 border-b border-border py-4 pl-4 first:pt-0 last:border-b-0",
-        isRunning && "border-l-2 border-l-primary bg-primary/5",
+        // px-6 matches every other section on the screen — the row is the page's content now, not
+        // a card inside a centred column.
+        "flex flex-col gap-3 border-b border-border px-6 py-4",
+        isRunning && "border-l-2 border-l-primary bg-primary/5 pl-5.5",
       )}
     >
       <div className="flex items-start justify-between gap-4">
@@ -109,7 +123,10 @@ export default function TrackerRow({ today }: TrackerRowProps) {
   );
 }
 
-function renderControl(control: Schemas.Control, props: ControlProps) {
+// DEV_NOTE: exported because the backfill panel renders the same switch against an earlier date —
+// a second copy of it there is how the two screens would drift apart the first time a control is
+// added.
+export function renderControl(control: Schemas.Control, props: ControlProps) {
   switch (control) {
     case "toggle":
       return <ToggleControl {...props} />;

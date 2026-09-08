@@ -29,10 +29,15 @@ EntitiesRoutes.post(
 
 EntitiesRoutes.get("/", checkAuth, zValidator("query", Schemas.ZGetEntitiesApiQuery), async (c) => {
   const userId = c.get("clerkUserId");
-  const { kind, archived } = c.req.valid("query");
+  const { kind, archived, withStats } = c.req.valid("query");
 
   const repo = new EntitiesRepo(c.env);
-  const response = await repo.getEntities({ userId, kind, archived: archived === "true" });
+  const response = await repo.getEntities({
+    userId,
+    kind,
+    archived: archived === "true",
+    withStats: withStats === "true",
+  });
 
   return c.json(response, response.isSuccess ? 200 : 500);
 });

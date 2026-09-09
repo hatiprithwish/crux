@@ -1,4 +1,5 @@
 import type * as Schemas from "@app/schemas";
+import Utilities from "@/utils";
 import { addDaysToLocalDate, formatDuration, formatMetricValue, getTodayLocalDate } from "./-utils";
 
 // DEV_NOTE: design/tracker-detail.png's ENTRIES column. What changed from the old flat
@@ -21,14 +22,19 @@ function dayLabel(localDate: string): string {
   });
 }
 
+// DEV_NOTE: the locale is pinned to en-US for the time rather than left to the viewer's — the
+// format is a product decision here ("2:30 PM"), and an unpinned locale renders the same instant as
+// "14:30" or "2:30 pm" depending on the browser. The date half is DD-MM-YYYY via Utilities, so
+// neither half is left to chance.
+// DEV_NOTE: the day is UTC (it is a localDate, a calendar day) but the *time* is the viewer's own —
+// occurredAt is a real instant, and the hour something happened is only meaningful locally.
 function formatTimestamp(localDate: string, occurredAt: Date | string): string {
-  const date = new Date(`${localDate}T00:00:00.000Z`).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
+  const date = Utilities.formatFullDate(localDate);
+  const time = new Date(occurredAt).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
   });
-  const time = new Date(occurredAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   return `${date} · ${time}`;
 }
 

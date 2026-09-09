@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/tanstack-react-start";
 import { Button } from "@/shadcn/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shadcn/ui/card";
+import Utilities from "@/utils";
 import { TrackersQueries, useUnarchiveAllTrackers, useUnarchiveTracker } from "../trackers/-data";
 import { EntitiesQueries, useUnarchiveAllEntities, useUnarchiveEntity } from "../entities/-data";
 import { describeSchedule } from "../trackers/-utils";
@@ -77,7 +78,7 @@ function ArchivedPage() {
                     <span className="text-xs text-muted-foreground">
                       {tracker.manifest.control} · {describeSchedule(tracker.manifest.schedule)}
                       {tracker.archivedAt
-                        ? ` · archived ${new Date(tracker.archivedAt).toISOString().slice(0, 10)}`
+                        ? ` · archived ${Utilities.formatTimestampDate(tracker.archivedAt)}`
                         : ""}
                     </span>
                   </div>
@@ -126,7 +127,7 @@ function ArchivedPage() {
                     <span className="text-xs text-muted-foreground">
                       {entity.kind}
                       {entity.archivedAt
-                        ? ` · archived ${new Date(entity.archivedAt).toISOString().slice(0, 10)}`
+                        ? ` · archived ${Utilities.formatTimestampDate(entity.archivedAt)}`
                         : ""}
                     </span>
                   </div>

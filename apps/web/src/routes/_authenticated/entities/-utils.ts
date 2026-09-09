@@ -1,4 +1,5 @@
 import type * as Schemas from "@app/schemas";
+import Utilities from "@/utils";
 import { getTodayLocalDate, addDaysToLocalDate } from "../trackers/-utils";
 
 // DEV_NOTE: design/things-mobile.png's tab order — accounts and categories first because money is
@@ -33,10 +34,13 @@ export const KIND_SINGULAR: Record<Schemas.EntityKind, string> = {
   goal: "goal",
 };
 
-// DEV_NOTE: "last today" beats "last 8 Sep" for the two dates a reader would otherwise have to
+// DEV_NOTE: "last today" beats "last 08-09-2026" for the two dates a reader would otherwise have to
 // compare against their own idea of today — the same reasoning as formatStartDate in
 // trackers/-utils.ts. Everything older is a plain date; a relative "23 days ago" is harder to place
 // than the date itself.
+// DEV_NOTE: the year used to be dropped within the current year to save width. DD-MM-YYYY always
+// carries it — the format is uniform across the app, and a date that changes shape by how old it is
+// costs the reader more than the four characters save.
 export function formatLastEntry(localDate: string | null): string {
   if (localDate === null) return "never used";
 
@@ -44,14 +48,7 @@ export function formatLastEntry(localDate: string | null): string {
   if (localDate === today) return "last today";
   if (localDate === addDaysToLocalDate(today, -1)) return "last yesterday";
 
-  const date = new Date(`${localDate}T00:00:00.000Z`);
-  const sameYear = localDate.slice(0, 4) === today.slice(0, 4);
-  return `last ${date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: sameYear ? undefined : "numeric",
-    timeZone: "UTC",
-  })}`;
+  return `last ${Utilities.formatFullDate(localDate)}`;
 }
 
 // DEV_NOTE: the section header's "net" figure. Same uniformity rule the server applies per entity

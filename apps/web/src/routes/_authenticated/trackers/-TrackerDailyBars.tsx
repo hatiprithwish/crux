@@ -1,5 +1,6 @@
 import type * as Schemas from "@app/schemas";
 import { cn } from "@/utils/tailwind";
+import Utilities from "@/utils";
 import { formatMetricValue } from "./-utils";
 
 // DEV_NOTE: design/tracker-detail-mobile.png's "MINUTES PER DAY" panel. The heatmap answers "did I
@@ -62,7 +63,7 @@ export function TrackerDailyBars({ days, metric, target }: TrackerDailyBarsProps
             <div
               key={day.localDate}
               className="flex h-full flex-1 items-end"
-              title={`${day.localDate} — ${
+              title={`${Utilities.formatFullDate(day.localDate)} — ${
                 day.sum === null || !metric
                   ? "nothing logged"
                   : formatMetricValue(day.sum, metric.semanticType, metric.canonicalUnit)

@@ -1,5 +1,6 @@
 import type * as Schemas from "@app/schemas";
 import { cn } from "@/utils/tailwind";
+import Utilities from "@/utils";
 import { addDaysToLocalDate, dayOfWeek } from "./-utils";
 
 // DEV_NOTE: architecture.md §6 — grid position is client-side arithmetic over a server-supplied day
@@ -114,7 +115,7 @@ export default function TrackerHeatmap({
             <div key={`blank-${paddingDate}`} className="h-4 w-full rounded-xs" />
           ))}
           {days.map((day) => {
-            const description = `${day.localDate} — ${STATE_LABELS[day.state]}${
+            const description = `${Utilities.formatFullDate(day.localDate)} — ${STATE_LABELS[day.state]}${
               day.sum !== null
                 ? ` (${day.sum}${day.target !== null ? ` / ${day.target}` : ""})`
                 : ""

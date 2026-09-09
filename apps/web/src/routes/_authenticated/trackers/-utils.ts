@@ -1,4 +1,5 @@
 import type * as Schemas from "@app/schemas";
+import Utilities from "@/utils";
 
 // DEV_NOTE: no per-user timezone preference exists anywhere in the app yet — dates are UTC-based
 // end to end (frontend and backend both), consistent with how the backend computes localDate.
@@ -267,17 +268,11 @@ export const AGG_HINTS: Record<Schemas.DefaultAgg, string> = {
   min: "The day's lowest reading. Right for a floor you're watching — a resting heart rate.",
 };
 
-// DEV_NOTE: "Today · 4 Sep 2026" in the design — the word matters more than the date, so the label
+// DEV_NOTE: "Today · 08-09-2026" in the design — the word matters more than the date, so the label
 // says which of the two it is rather than making the reader compare a date against their own idea
 // of today.
 export function formatStartDate(localDate: string): string {
-  const date = new Date(`${localDate}T00:00:00.000Z`);
-  const formatted = date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  const formatted = Utilities.formatFullDate(localDate);
   return localDate === getTodayLocalDate() ? `Today · ${formatted}` : formatted;
 }
 

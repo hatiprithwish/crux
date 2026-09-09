@@ -9,6 +9,15 @@ export interface AppTableColumn<TRow> {
   sortKey?: string;
   /** If true, column is excluded from rendering */
   hidden?: boolean;
+  /**
+   * If true, the column always renders and the user cannot hide it — it is left out of the
+   * visibility panel, out of "Hide all", and its header menu offers no Hide.
+   *
+   * For columns that are not data: a row's action menu, a selection checkbox. Hiding one of those
+   * removes an interaction rather than a fact, and a user who does it by accident has no way to
+   * discover what went missing — an actions column has no header text to find it by.
+   */
+  alwaysVisible?: boolean;
   /** Tooltip shown on the column header (info icon) */
   headerTooltip?: string;
   /** Custom cell renderer — overrides default value display */

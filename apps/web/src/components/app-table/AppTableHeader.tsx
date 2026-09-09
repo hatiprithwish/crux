@@ -77,47 +77,52 @@ function SortableHeaderCell<TRow>({
     }
   }
 
-  return (
-    <AppTableColumnMenu onHide={() => onHideColumn(column.key)}>
-      <TableHead
-        ref={setNodeRef}
-        style={style}
-        className={cn(
-          "h-auto select-none whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground",
-          isSortable && "cursor-pointer hover:text-foreground transition-colors",
-          column.headerClassName,
+  const head = (
+    <TableHead
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "h-auto select-none whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground",
+        isSortable && "cursor-pointer hover:text-foreground transition-colors",
+        column.headerClassName,
+      )}
+      onClick={handleSortClick}
+    >
+      <div className="flex items-center gap-1">
+        <span
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          className={DRAG_HANDLE_CLASS}
+          suppressHydrationWarning
+        >
+          <DotsSixVertical className="h-3.5 w-3.5" />
+        </span>
+
+        {column.header}
+
+        {sortIcon}
+
+        {column.headerTooltip && (
+          <Tooltip>
+            <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <Info className="h-3 w-3 text-muted-foreground/60 hover:text-muted-foreground cursor-pointer" />
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs text-xs">
+              {column.headerTooltip}
+            </TooltipContent>
+          </Tooltip>
         )}
-        onClick={handleSortClick}
-      >
-        <div className="flex items-center gap-1">
-          <span
-            {...attributes}
-            {...listeners}
-            onClick={(e) => e.stopPropagation()}
-            className={DRAG_HANDLE_CLASS}
-            suppressHydrationWarning
-          >
-            <DotsSixVertical className="h-3.5 w-3.5" />
-          </span>
-
-          {column.header}
-
-          {sortIcon}
-
-          {column.headerTooltip && (
-            <Tooltip>
-              <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Info className="h-3 w-3 text-muted-foreground/60 hover:text-muted-foreground cursor-pointer" />
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-xs text-xs">
-                {column.headerTooltip}
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
-      </TableHead>
-    </AppTableColumnMenu>
+      </div>
+    </TableHead>
   );
+
+  // DEV_NOTE: the column menu's only item is Hide, so a column that can't be hidden gets no menu at
+  // all rather than an empty one. Returned bare, which also stops an actions column's header from
+  // opening a dropdown on click when there is nothing in it to choose.
+  if (column.alwaysVisible) return head;
+
+  return <AppTableColumnMenu onHide={() => onHideColumn(column.key)}>{head}</AppTableColumnMenu>;
 }
 
 // ─── AppTableHeader ─────────────────────────────────────────────────────────

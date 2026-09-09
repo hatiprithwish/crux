@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import TrackerRow from "@/routes/_authenticated/trackers/-TrackerRow";
 import type * as Schemas from "@app/schemas";
 
@@ -24,9 +24,13 @@ vi.mock("@/routes/_authenticated/trackers/-EntityLinkFields", () => ({
   EntityLinkFields: () => null,
 }));
 
+// DEV_NOTE: the metric is overridable because a control and its metric are independent choices —
+// the form derives one from the other, but Change lets a daily_total write a duration, which is
+// exactly the combination the display-unit conversion exists for.
 function makeTracker(
   control: Schemas.Control,
   manifest: Partial<Schemas.TrackerManifest> = {},
+  metric: Partial<Schemas.TrackerMetricDetail> = {},
 ): Schemas.TrackerApiShape {
   return {
     publicId: "trk_test123",
@@ -58,6 +62,7 @@ function makeTracker(
         semanticType: "count",
         canonicalUnit: "count",
         defaultDirection: "higher_better",
+        ...metric,
       },
     ],
     createdAt: new Date(),
@@ -81,6 +86,12 @@ function makeToday(
 }
 
 describe("TrackerRow", () => {
+  // DEV_NOTE: the quick-add spy is module-level, and toHaveBeenCalledWith matches *any* recorded
+  // call — without this, a payload assertion could be satisfied by the previous test's call.
+  beforeEach(() => {
+    mockQuickAdd.mockClear();
+  });
+
   it("renders the tracker name and schedule", () => {
     render(<TrackerRow today={makeToday(makeTracker("toggle"))} />);
     expect(screen.getByText("Test Tracker")).toBeInTheDocument();
@@ -136,6 +147,78 @@ describe("TrackerRow", () => {
     render(<TrackerRow today={makeToday(makeTracker("timer"), { openSession })} />);
     expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
     expect(screen.getByText(/deep work/i)).toBeInTheDocument();
+  });
+
+  // DEV_NOTE: the conversion is the whole point of manifest.displayUnit, and it is invisible in the
+  // UI — a wrong factor stores a wrong number and shows a plausible one. Asserting on the payload
+  // is the only place the mistake is visible.
+  it("sends a duration daily total in canonical seconds, not as typed", async () => {
+    const user = userEvent.setup();
+    const tracker = makeTracker(
+      "daily_total",
+      { displayUnit: "minutes" },
+      { semanticType: "duration_seconds", canonicalUnit: "seconds" },
+    );
+
+    render(<TrackerRow today={makeToday(tracker)} />);
+    await user.type(screen.getByRole("spinbutton", { name: /today's total/i }), "4");
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(mockQuickAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        publicId: "trk_test123",
+        payload: expect.objectContaining({ control: "daily_total", total: 240 }),
+      }),
+    );
+  });
+
+  // DEV_NOTE: manifest_json has no migration behind it, so every tracker created before the field
+  // existed reads it as absent. Absent has to mean "canonical", or shipping this would have
+  // multiplied every existing duration tracker's next entry by 60.
+  it("leaves a duration daily total untouched when no display unit is set", async () => {
+    const user = userEvent.setup();
+    const tracker = makeTracker(
+      "daily_total",
+      {},
+      { semanticType: "duration_seconds", canonicalUnit: "seconds" },
+    );
+
+    render(<TrackerRow today={makeToday(tracker)} />);
+    await user.type(screen.getByRole("spinbutton", { name: /today's total/i }), "4");
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(mockQuickAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ total: 4 }),
+      }),
+    );
+  });
+
+  // A count metric has no second unit to be typed in, so a stale manifest value converts nothing.
+  it("ignores a display unit on a metric that has none", async () => {
+    const user = userEvent.setup();
+    const tracker = makeTracker("daily_total", { displayUnit: "minutes" });
+
+    render(<TrackerRow today={makeToday(tracker)} />);
+    await user.type(screen.getByRole("spinbutton", { name: /today's total/i }), "4");
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(mockQuickAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ total: 4 }),
+      }),
+    );
+  });
+
+  it("reads the day's total back in the metric's own terms", () => {
+    const tracker = makeTracker(
+      "daily_total",
+      { displayUnit: "minutes" },
+      { semanticType: "duration_seconds", canonicalUnit: "seconds" },
+    );
+
+    render(<TrackerRow today={makeToday(tracker, { todaySum: 165, todayCount: 1 })} />);
+    expect(screen.getByText("2m 45s")).toBeInTheDocument();
   });
 
   it("renders the archive option in the overflow menu", async () => {

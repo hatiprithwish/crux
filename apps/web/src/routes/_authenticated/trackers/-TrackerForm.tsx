@@ -27,6 +27,7 @@ import {
   AGG_HINTS,
   AGG_LABELS,
   CONTROL_TILES,
+  DISPLAY_UNIT_LABELS,
   DIRECTION_HELP,
   DIRECTION_HINTS,
   DIRECTION_LABELS,
@@ -37,6 +38,9 @@ import {
   formatStartDate,
   getTodayLocalDate,
   slugifyMetricKey,
+  supportsDisplayUnit,
+  toCanonical,
+  toDisplay,
 } from "./-utils";
 
 // DEV_NOTE: this form *is* the manifest engine's front door — everything Phase 0–3 hardcoded per
@@ -66,6 +70,10 @@ const ZTrackerFormValues = z
     scheduleCount: z.number().int().min(1).max(7),
     target: z.string(),
     step: z.string(),
+    // DEV_NOTE: always a concrete unit in form state, never null — the field has to hold an answer
+    // for the Select to render one. Whether that answer is *stored* is decided on submit, by the
+    // metric: a count metric writes null, because "4 minutes of pushups" is not a sentence.
+    displayUnit: Schemas.ZDisplayUnit,
     activeFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     metricMode: z.enum(["derived", "custom", "existing"]),
     metricPublicId: z.string(),
@@ -200,6 +208,15 @@ function valuesFromTracker(tracker: Schemas.TrackerApiShape): TrackerFormValues 
     ) ?? CONTROL_TILES[0];
   const primary = tracker.metricDetails.find((detail) => detail.key === tracker.primaryMetricKey);
 
+  // DEV_NOTE: a manifest written before displayUnit existed reads as "seconds", which is the
+  // identity conversion — the stored target comes back into the field exactly as it went in, so
+  // opening the edit screen on an old tracker and saving it changes no number. The unit is only
+  // honoured for a metric that has one, so a stale value on a count metric converts nothing.
+  const seededUnit =
+    primary && supportsDisplayUnit(primary.semanticType)
+      ? (manifest.displayUnit ?? "seconds")
+      : null;
+
   return {
     name: tracker.name,
     icon: tracker.icon ?? null,
@@ -208,8 +225,12 @@ function valuesFromTracker(tracker: Schemas.TrackerApiShape): TrackerFormValues 
     scheduleType: manifest.schedule.type,
     scheduleDays: manifest.schedule.type === "days_of_week" ? manifest.schedule.days : [],
     scheduleCount: manifest.schedule.type === "times_per_week" ? manifest.schedule.count : 3,
-    target: manifest.target === null ? "" : String(manifest.target),
-    step: manifest.step === null ? "" : String(manifest.step),
+    target: manifest.target === null ? "" : String(toDisplay(manifest.target, seededUnit)),
+    // DEV_NOTE: step converts alongside target because it is the same kind of number — a stepper on
+    // a duration metric moves by a quantity the user typed, and leaving one of the two in canonical
+    // seconds while the other is in minutes is the exact confusion this field exists to end.
+    step: manifest.step === null ? "" : String(toDisplay(manifest.step, seededUnit)),
+    displayUnit: manifest.displayUnit ?? "seconds",
     // DEV_NOTE: a stored manifest always carries a resolved direction (the Repo resolves null to
     // the metric's default on write). The fallback covers a manifest written before the field
     // existed, in the window before migration 0004 has run against the row.
@@ -265,6 +286,11 @@ export function TrackerForm({
         scheduleCount: 3,
         target: "",
         step: "",
+        // DEV_NOTE: "minutes" rather than "seconds" as the starting answer — a duration tracker is
+        // a thing someone spends minutes or hours on, and seconds is the unit they'd have to
+        // notice and change. It's inert until the metric is a duration, and the Select only appears
+        // then, so a toggle habit never sees it.
+        displayUnit: "minutes",
         direction: deriveDirection("toggle"),
         activeFrom: getTodayLocalDate(),
         metricMode: "derived",
@@ -280,6 +306,11 @@ export function TrackerForm({
     onSubmit: async ({ value }) => {
       const tile = CONTROL_TILES.find((option) => option.key === value.tileKey) ?? CONTROL_TILES[0];
       const { metric, isExisting } = resolveMetric(value, tile.control, metrics);
+
+      // DEV_NOTE: the metric decides whether the form's unit is real, not the form — a user who
+      // picked "minutes" and then repointed the tracker at a count metric must not store a unit
+      // that would silently multiply every future entry by 60.
+      const displayUnit = supportsDisplayUnit(metric.semanticType) ? value.displayUnit : null;
 
       const metricSpec: Schemas.TrackerMetricSpec = isExisting
         ? { mode: "existing", metricPublicId: value.metricPublicId }
@@ -298,12 +329,17 @@ export function TrackerForm({
             // DEV_NOTE: the primary metric's key is added server-side — the Repo owns that
             // invariant so it holds for every caller, not just this form.
             metrics: [],
-            target: value.target.trim() === "" ? null : Number(value.target),
-            step: value.step.trim() === "" ? null : Number(value.step),
+            // DEV_NOTE: converted here and nowhere else on the way out — the API, the DB and every
+            // aggregate that reads them hold canonical units only (invariant 2). `displayUnit`
+            // travels beside them so the same numbers can be read back in the unit they were typed.
+            target:
+              value.target.trim() === "" ? null : toCanonical(Number(value.target), displayUnit),
+            step: value.step.trim() === "" ? null : toCanonical(Number(value.step), displayUnit),
             direction: value.direction,
             entryMode: value.entryMode,
             schedule: buildSchedule(value),
             compute: tile.compute,
+            displayUnit,
           },
           activeFrom: value.activeFrom,
         },
@@ -587,8 +623,9 @@ export function TrackerForm({
             {(field) => (
               <div className="flex flex-col gap-2 px-6 py-5">
                 <FieldLabelText htmlFor={field.name}>Starts</FieldLabelText>
-                {/* DEV_NOTE: the date input renders the raw YYYY-MM-DD, so the human reading of it
-                    ("Today · 4 Sep 2026") sits underneath rather than replacing the control. */}
+                {/* DEV_NOTE: the date input's own rendering follows the browser's locale and can't
+                    be forced, so the app's reading of it ("Today · 09-09-2026") sits underneath
+                    rather than replacing the control. */}
                 <Input
                   id={field.name}
                   type="date"
@@ -608,24 +645,76 @@ export function TrackerForm({
         {/* 4 — optional */}
         <SectionHeading index={4} title="Optional" />
         <div className="grid grid-cols-1 border-b border-border sm:grid-cols-2 lg:grid-cols-4">
-          <form.Field name="target">
-            {(field) => (
-              <div className="flex flex-col gap-2 px-6 py-5 sm:border-r sm:border-border">
-                <FieldLabelText htmlFor={field.name}>Target</FieldLabelText>
-                <Input
-                  id={field.name}
-                  type="number"
-                  step="any"
-                  placeholder="Not set"
-                  value={field.state.value}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  onBlur={field.handleBlur}
-                  className={UNDERLINE_INPUT}
-                />
-                <FieldError errors={field.state.meta.errors} />
-              </div>
-            )}
-          </form.Field>
+          {/* DEV_NOTE: the unit sits inside the Target cell rather than in a fifth column, because
+              it is not a fifth question — it's what the number to its left means. A target of 4
+              beside a unit of "minutes" is one fact; the same two fields a column apart are two. */}
+          <form.Subscribe selector={(state) => state.values}>
+            {(values) => {
+              const tile =
+                CONTROL_TILES.find((option) => option.key === values.tileKey) ?? CONTROL_TILES[0];
+              const { metric } = resolveMetric(values, tile.control, metrics);
+              const hasDisplayUnit = supportsDisplayUnit(metric.semanticType);
+
+              return (
+                <div className="flex flex-col gap-2 px-6 py-5 sm:border-r sm:border-border">
+                  <form.Field name="target">
+                    {(field) => (
+                      <>
+                        <FieldLabelText htmlFor={field.name}>Target</FieldLabelText>
+                        <div className="flex items-end gap-2">
+                          <Input
+                            id={field.name}
+                            type="number"
+                            step="any"
+                            placeholder="Not set"
+                            value={field.state.value}
+                            onChange={(event) => field.handleChange(event.target.value)}
+                            onBlur={field.handleBlur}
+                            className={cn(UNDERLINE_INPUT, hasDisplayUnit && "min-w-0 flex-1")}
+                          />
+                          {hasDisplayUnit ? (
+                            <form.Field name="displayUnit">
+                              {(unitField) => (
+                                <Select
+                                  value={unitField.state.value}
+                                  onValueChange={(value) =>
+                                    unitField.handleChange(value as Schemas.DisplayUnit)
+                                  }
+                                >
+                                  <SelectTrigger
+                                    aria-label="Unit the target and every entry are typed in"
+                                    className={cn(UNDERLINE_TRIGGER, "w-28 shrink-0")}
+                                  >
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectGroup>
+                                      {Schemas.ZDisplayUnit.options.map((option) => (
+                                        <SelectItem key={option} value={option}>
+                                          {DISPLAY_UNIT_LABELS[option]}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectGroup>
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </form.Field>
+                          ) : null}
+                        </div>
+                        {hasDisplayUnit ? (
+                          <span className="text-xs text-muted-foreground">
+                            What you type here and on every entry. Stored as seconds either way, so
+                            changing it re-reads your history rather than rewriting it.
+                          </span>
+                        ) : null}
+                        <FieldError errors={field.state.meta.errors} />
+                      </>
+                    )}
+                  </form.Field>
+                </div>
+              );
+            }}
+          </form.Subscribe>
 
           {/* DEV_NOTE: next to Target on purpose — the two are one question ("is this number a
               floor or a ceiling?"), and the backend scores a day by reading them together. */}
@@ -674,6 +763,22 @@ export function TrackerForm({
                   onBlur={field.handleBlur}
                   className={UNDERLINE_INPUT}
                 />
+                {/* DEV_NOTE: step is typed in the same unit as the target — it's the amount one tap
+                    moves, and a stepper whose target is in minutes while its step is in seconds
+                    would move by a 60th of what the number says. */}
+                <form.Subscribe selector={(state) => state.values}>
+                  {(values) => {
+                    const tile =
+                      CONTROL_TILES.find((option) => option.key === values.tileKey) ??
+                      CONTROL_TILES[0];
+                    const { metric } = resolveMetric(values, tile.control, metrics);
+                    return supportsDisplayUnit(metric.semanticType) ? (
+                      <span className="text-xs text-muted-foreground">
+                        In {DISPLAY_UNIT_LABELS[values.displayUnit]}, same as the target.
+                      </span>
+                    ) : null;
+                  }}
+                </form.Subscribe>
                 <FieldError errors={field.state.meta.errors} />
               </div>
             )}

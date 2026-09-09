@@ -6,6 +6,20 @@ import { ZComputeKey } from "./ComputeCommon";
 
 const ZLocalDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+// DEV_NOTE: the unit a human types and reads, which is not the unit anything is stored in. A
+// duration metric is always canonically seconds (invariant 2, UNIT_FOR_SEMANTIC_TYPE), and every
+// read path already converts on the way out — formatMetricValue turns 165 into "2m 45s". The write
+// path had no inverse, so a box asking for a duration accepted a bare number and meant seconds by
+// it: typing 4 for four minutes stored four seconds, and the target it was scored against had the
+// same problem. This field is that inverse's missing half — what the number in the input means.
+//
+// DEV_NOTE: deliberately NOT on the metric. A metric is user-global and shared across trackers
+// (that sharing is what makes cross-tracker rollup possible), while "I think about this one in
+// minutes" is a per-tracker reading habit: sleep is hours, meditation minutes, a plank seconds, and
+// all three can sit on one `seconds` metric. Same reasoning that moved `direction` here.
+export const ZDisplayUnit = z.enum(["seconds", "minutes", "hours"]);
+export type DisplayUnit = z.infer<typeof ZDisplayUnit>;
+
 // DEV_NOTE: schedule.type discriminates the shape — see architecture.md §5 "trackers" manifest shape.
 export const ZTrackerSchedule = z.discriminatedUnion("type", [
   z.object({ type: z.literal("daily") }),
@@ -37,6 +51,15 @@ export const ZTrackerManifest = z.object({
   entryMode: z.enum(["live", "retro"]),
   schedule: ZTrackerSchedule,
   compute: ZComputeKey.nullable(),
+  // DEV_NOTE: nullable = "read this tracker in its metric's canonical unit", which is the honest
+  // answer for every metric that isn't a duration — a count of pushups has no second unit to be
+  // typed in.
+  // DEV_NOTE: optional as well as nullable, and a `.default()` would have been the wrong tool.
+  // manifest_json is a JSON column with no migration behind it, and TrackersDAL reads it with a
+  // cast rather than a parse (`manifestJson as TrackerManifest`) — so no default ever runs on the
+  // way out, and every row written before today genuinely has no such key. A required field would
+  // have typed those rows as carrying a value they don't. Read it as `?? null`.
+  displayUnit: ZDisplayUnit.nullable().optional(),
 });
 export type TrackerManifest = z.infer<typeof ZTrackerManifest>;
 

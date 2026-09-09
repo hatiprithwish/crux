@@ -5,7 +5,7 @@ import { Field, FieldLabel } from "@/shadcn/ui/field";
 import type * as Schemas from "@app/schemas";
 import type { ControlProps } from "./-TrackerRow";
 import { EntityLinkFields } from "./-EntityLinkFields";
-import { formatDayPhrase } from "./-utils";
+import { DISPLAY_UNIT_LABELS, formatDayPhrase, resolveDisplayUnit, toCanonical } from "./-utils";
 
 // DEV_NOTE: the general case — one input per metric the manifest declares (a meal writes four
 // readings, a workout set two; architecture.md §5 "entry_values"). The manifest is the field list,
@@ -18,10 +18,20 @@ export function FormControl({ tracker, localDate, onQuickAdd, isPending }: Contr
 
   const filled = tracker.manifest.metrics.filter((key) => (values[key] ?? "") !== "");
 
+  // DEV_NOTE: manifest.displayUnit describes the tracker's *primary* metric and nothing else — it
+  // is one field, and a form writing four readings can't have four meanings for it. Every secondary
+  // field keeps asking for its own canonical unit, which is what its label has always said.
+  const primaryDetail = tracker.metricDetails.find(
+    (metric) => metric.key === tracker.primaryMetricKey,
+  );
+  const primaryDisplayUnit = resolveDisplayUnit(tracker.manifest, primaryDetail?.semanticType);
+  const unitFor = (metricKey: string) =>
+    metricKey === tracker.primaryMetricKey ? primaryDisplayUnit : null;
+
   const submit = () => {
     const payloadValues = filled.map((metricKey) => ({
       metricKey,
-      valueNum: Number(values[metricKey]),
+      valueNum: toCanonical(Number(values[metricKey]), unitFor(metricKey)),
     }));
     if (payloadValues.length === 0 || payloadValues.some((value) => Number.isNaN(value.valueNum))) {
       return;
@@ -46,13 +56,15 @@ export function FormControl({ tracker, localDate, onQuickAdd, isPending }: Contr
           report as the repository bug it is. */}
       {tracker.manifest.metrics.map((metricKey) => {
         const detail = tracker.metricDetails.find((metric) => metric.key === metricKey);
+        // The unit the box is typed in, which is the canonical one unless this tracker overrode it.
+        const typedUnit = unitFor(metricKey);
         return (
           <Field key={metricKey}>
             <FieldLabel htmlFor={`value-${metricKey}`}>
               {detail?.name ?? metricKey}
               {detail ? (
                 <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  {detail.canonicalUnit}
+                  {typedUnit === null ? detail.canonicalUnit : DISPLAY_UNIT_LABELS[typedUnit]}
                 </span>
               ) : null}
             </FieldLabel>

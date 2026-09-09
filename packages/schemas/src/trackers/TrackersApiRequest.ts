@@ -27,12 +27,17 @@ export type CreateTrackerApiRequest = z.infer<typeof ZCreateTrackerApiRequest>;
 // DEV_NOTE: `direction` is patchable alongside `target` — the two are one judgement (is 30 minutes
 // a floor or a ceiling?), and a tracker whose target can be edited while its direction can't would
 // let a user set a cap that still scores as a floor.
+// DEV_NOTE: `displayUnit` is patchable for the same reason `target` is, and the two travel
+// together — it says what unit the target and every quick-add box are typed in, so an edit moving
+// a tracker from seconds to minutes without it would leave the new target in the old unit.
+// Changing it reinterprets nothing already stored: entries are canonical seconds either way.
 export const ZUpdateTrackerManifest = ZTrackerManifest.pick({
   target: true,
   step: true,
   direction: true,
   entryMode: true,
   schedule: true,
+  displayUnit: true,
 })
   .partial()
   .strict();

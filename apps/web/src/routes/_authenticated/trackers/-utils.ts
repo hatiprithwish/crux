@@ -48,6 +48,68 @@ export function formatDuration(totalSeconds: number): string {
   return `${seconds}s`;
 }
 
+// --- Display units: the inverse of formatMetricValue -------------------------------------------
+// DEV_NOTE: formatMetricValue is the one place a canonical number becomes a readable one. This is
+// the other direction — the one place a number a human typed becomes a canonical one — and it only
+// exists because the write path had no such place. A duration input took a bare number and stored
+// it as seconds, so typing 4 for four minutes wrote four seconds; the target field beside it did
+// the same, and the two were then compared to each other happily.
+//
+// DEV_NOTE: seconds is in the list on purpose. It is the identity conversion, which makes "log in
+// seconds" a thing a user can choose rather than the silent default they can't see.
+const DISPLAY_UNIT_SECONDS: Record<Schemas.DisplayUnit, number> = {
+  seconds: 1,
+  minutes: 60,
+  hours: 3600,
+};
+
+export const DISPLAY_UNIT_LABELS: Record<Schemas.DisplayUnit, string> = {
+  seconds: "seconds",
+  minutes: "minutes",
+  hours: "hours",
+};
+
+// The short form for an input's suffix, where the field label has already said what it is.
+export const DISPLAY_UNIT_SUFFIXES: Record<Schemas.DisplayUnit, string> = {
+  seconds: "s",
+  minutes: "min",
+  hours: "h",
+};
+
+// DEV_NOTE: duration is the only semantic type with a display unit today, and the check is on the
+// *type* rather than on a flag, so a metric that isn't a duration can't be given one by a stale
+// manifest. currency_minor is the other type whose stored unit differs from its typed one, but it
+// converts by a fixed 100 with no choice to make (formatMinorAmount / the amount pad), so it needs
+// no field.
+export function supportsDisplayUnit(semanticType: Schemas.SemanticType): boolean {
+  return semanticType === "duration_seconds";
+}
+
+// DEV_NOTE: null means "this metric has no unit but its canonical one" — every caller reads that as
+// "no conversion, no suffix", which is exactly how every control behaved before this existed.
+export function resolveDisplayUnit(
+  manifest: Schemas.TrackerManifest,
+  semanticType: Schemas.SemanticType | undefined,
+): Schemas.DisplayUnit | null {
+  if (semanticType === undefined || !supportsDisplayUnit(semanticType)) return null;
+  return manifest.displayUnit ?? null;
+}
+
+// A number as typed → the canonical number stored. Rounded because a duration is whole seconds.
+export function toCanonical(value: number, displayUnit: Schemas.DisplayUnit | null): number {
+  if (displayUnit === null) return value;
+  return Math.round(value * DISPLAY_UNIT_SECONDS[displayUnit]);
+}
+
+// DEV_NOTE: the inverse, for seeding an input with a stored value (the edit form's target). Not for
+// *rendering* a value — formatMetricValue owns that, and "2m 45s" reads better than "2.75". The
+// tail is trimmed because 165 seconds in minutes is 2.75, and an input showing 2.7500000000000004
+// is how a round-trip through this function loses a user's trust.
+export function toDisplay(canonical: number, displayUnit: Schemas.DisplayUnit | null): number {
+  if (displayUnit === null) return canonical;
+  return Number((canonical / DISPLAY_UNIT_SECONDS[displayUnit]).toFixed(6));
+}
+
 // DEV_NOTE: currency_minor metrics store minor units (paise/cents) — display divides by 100, the
 // inverse of what the amount pad does on submit. Canonical units are stored, never display units
 // (invariant 2).
@@ -75,6 +137,20 @@ export function formatMetricValue(
   if (semanticType === "boolean") return `${number} ${Number(number) === 1 ? "day" : "days"}`;
   return `${number} ${canonicalUnit}`;
 }
+
+// DEV_NOTE: the bare name of a control, for places that have already established the context —
+// a table column headed "Control", where CONTROL_LABELS' explanatory half is repeated noise nine
+// rows down. Kept as its own map rather than split off CONTROL_LABELS at the em dash, because
+// parsing a display string to recover half of it makes the punctuation load-bearing.
+export const CONTROL_NAMES: Record<Schemas.Control, string> = {
+  toggle: "Toggle",
+  increment: "Increment",
+  stepper: "Stepper",
+  daily_total: "Daily total",
+  timer: "Timer",
+  amount_pad: "Amount",
+  form: "Form",
+};
 
 export const CONTROL_LABELS: Record<Schemas.Control, string> = {
   toggle: "Toggle — done / not done",

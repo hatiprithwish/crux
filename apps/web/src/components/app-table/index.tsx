@@ -46,7 +46,21 @@ export function AppTable<TRow>({
     Object.fromEntries(allColumns.map((c) => [c.key, true])),
   );
 
-  const visibleColumns = allColumns.filter((c) => columnVisibility[c.key]);
+  // DEV_NOTE: an `alwaysVisible` column ignores columnVisibility entirely rather than being pinned
+  // to true in the map — "Hide all" writes false across every key it knows about, and a column
+  // whose visibility is derived can't be turned off by a write it doesn't read.
+  const isColumnVisible = (key: string) =>
+    allColumns.some((c) => c.key === key && c.alwaysVisible) || !!columnVisibility[key];
+
+  const visibleColumns = allColumns.filter((c) => isColumnVisible(c.key));
+
+  // The visibility panel only offers what the user is allowed to turn off.
+  const hideableColumns = allColumns.filter((c) => !c.alwaysVisible);
+
+  // DEV_NOTE: header, body and footer are all driven by this, not by columnOrder directly — an
+  // ordered list filtered on columnVisibility alone would drop an alwaysVisible column out of the
+  // render even while visibleColumns still contained it.
+  const visibleColumnOrder = columnOrder.filter(isColumnVisible);
 
   const handleHideColumn = (key: string) => {
     setColumnVisibility((prev) => ({ ...prev, [key]: false }));
@@ -87,7 +101,7 @@ export function AppTable<TRow>({
         {/* ─── Toolbar ──────────────────────────────────────────────────── */}
         <div className="flex items-center justify-end border-b border-border px-3 py-1.5">
           <AppTableVisibilityPanel
-            columns={allColumns}
+            columns={hideableColumns}
             columnVisibility={columnVisibility}
             onToggle={handleToggleColumn}
             onHideAll={handleHideAll}
@@ -99,7 +113,7 @@ export function AppTable<TRow>({
           <Table>
             <AppTableHeader
               columns={visibleColumns}
-              columnOrder={columnOrder.filter((k) => columnVisibility[k])}
+              columnOrder={visibleColumnOrder}
               sortBy={sortBy}
               sortOrder={sortOrder}
               onSort={onSort}
@@ -109,7 +123,7 @@ export function AppTable<TRow>({
 
             <AppTableBody
               columns={visibleColumns}
-              columnOrder={columnOrder.filter((k) => columnVisibility[k])}
+              columnOrder={visibleColumnOrder}
               data={data}
               keyExtractor={keyExtractor}
               isLoading={isLoading}
@@ -123,7 +137,7 @@ export function AppTable<TRow>({
             {showFooter && (
               <AppTableFooter
                 columns={visibleColumns}
-                columnOrder={columnOrder.filter((k) => columnVisibility[k])}
+                columnOrder={visibleColumnOrder}
                 data={data}
               />
             )}

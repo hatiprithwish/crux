@@ -68,6 +68,12 @@ function EditTrackerPage() {
                   manifest: {
                     target: value.tracker.manifest.target,
                     step: value.tracker.manifest.step,
+                    // DEV_NOTE: direction and displayUnit travel with the target because all three
+                    // are one judgement about the same number — is it a floor or a ceiling, and in
+                    // what unit was it typed. Sending the target without the unit would store a
+                    // number in minutes as if it were seconds.
+                    direction: value.tracker.manifest.direction,
+                    displayUnit: value.tracker.manifest.displayUnit,
                     entryMode: value.tracker.manifest.entryMode,
                     schedule: value.tracker.manifest.schedule,
                   },

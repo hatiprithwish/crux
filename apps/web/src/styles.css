@@ -49,7 +49,13 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* DEV_NOTE: `color-scheme` is what tells the browser which palette to draw the parts of a native
+   control we don't own — the calendar icon inside `input[type="date"]`, its picker popup,
+   scrollbars, autofill. Without it every one of those renders light-mode, which is why the calendar
+   icon was black-on-black in dark mode. Declaring it here rather than filtering the icon per input
+   fixes the whole class of them at once, including controls added later. */
 :root {
+  color-scheme: light;
   --background: oklch(1 0 0);
   --foreground: oklch(0.148 0.004 228.8);
   --card: oklch(1 0 0);
@@ -85,6 +91,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.16 0.004 250);
   --foreground: oklch(0.96 0.002 197.1);
   --card: oklch(0.2 0.006 250);

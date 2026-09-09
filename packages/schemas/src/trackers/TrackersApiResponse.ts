@@ -7,6 +7,7 @@ import type {
   TrackerTodayApiShape,
 } from "./TrackersCommon";
 import type { MoneyTransferComputeResult } from "./ComputeCommon";
+import type { TrackerTargetApiShape } from "./TrackerTargetsCommon";
 import type { ApiResponse } from "../common";
 
 export interface CreateTrackerApiResponse extends ApiResponse {
@@ -75,4 +76,19 @@ export interface UnarchiveTrackerApiResponse extends ApiResponse {
 
 export interface UnarchiveAllTrackersApiResponse extends ApiResponse {
   restoredCount?: number;
+}
+
+// DEV_NOTE: always the whole history, ascending by effectiveFrom, never one row — a single target
+// row means nothing on its own ("300 from 1 Sept" is only a fact about September once you know
+// what follows it), and the screen that reads this renders the eras between rows.
+export interface GetTrackerTargetsApiResponse extends ApiResponse {
+  targets?: TrackerTargetApiShape[];
+}
+
+// DEV_NOTE: answers with the full history rather than just the row written, for the same reason
+// update answers with the tracker — a write here re-cuts every era around it (a row inserted
+// between two others shortens the one before it), so returning one row would leave the client
+// holding a list it now has to refetch to trust.
+export interface WriteTrackerTargetApiResponse extends ApiResponse {
+  targets?: TrackerTargetApiShape[];
 }

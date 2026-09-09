@@ -74,6 +74,12 @@ const ZTrackerFormValues = z
     // for the Select to render one. Whether that answer is *stored* is decided on submit, by the
     // metric: a count metric writes null, because "4 minutes of pushups" is not a sentence.
     displayUnit: Schemas.ZDisplayUnit,
+    // DEV_NOTE: the day the target in this form starts counting, not a property of the tracker —
+    // it is written to the target history rather than to the manifest, and only when the target
+    // actually changed. Edit mode only: a new tracker's first target era opens on activeFrom, which
+    // is the field above it, and asking the same question twice on the create screen would suggest
+    // the two can differ.
+    targetEffectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     activeFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     metricMode: z.enum(["derived", "custom", "existing"]),
     metricPublicId: z.string(),
@@ -231,6 +237,9 @@ function valuesFromTracker(tracker: Schemas.TrackerApiShape): TrackerFormValues 
     // seconds while the other is in minutes is the exact confusion this field exists to end.
     step: manifest.step === null ? "" : String(toDisplay(manifest.step, seededUnit)),
     displayUnit: manifest.displayUnit ?? "seconds",
+    // Today, because the common edit is "from now on I'm aiming for this". Backdating is a
+    // deliberate act, so it starts from the answer that needs no thought.
+    targetEffectiveFrom: getTodayLocalDate(),
     // DEV_NOTE: a stored manifest always carries a resolved direction (the Repo resolves null to
     // the metric's default on write). The fallback covers a manifest written before the field
     // existed, in the window before migration 0004 has run against the row.
@@ -251,7 +260,15 @@ function valuesFromTracker(tracker: Schemas.TrackerApiShape): TrackerFormValues 
 }
 
 interface TrackerFormProps {
-  onSubmit: (value: Schemas.CreateTrackerApiRequest) => Promise<void>;
+  // DEV_NOTE: `meta` carries what isn't part of a tracker's stored shape — today, the day the
+  // target in this submission starts counting, which the edit screen forwards to the target
+  // history and the create screen ignores (a new tracker's first era opens on activeFrom). Kept
+  // out of the request object rather than bolted onto the manifest, because manifest_json is the
+  // tracker's configuration and this is a fact about when a configuration became true.
+  onSubmit: (
+    value: Schemas.CreateTrackerApiRequest,
+    meta: { targetEffectiveFrom: string },
+  ) => Promise<void>;
   onCancel: () => void;
   submitLabel?: string;
   // DEV_NOTE: present = edit an existing tracker. The form still emits a full
@@ -292,6 +309,7 @@ export function TrackerForm({
         // then, so a toggle habit never sees it.
         displayUnit: "minutes",
         direction: deriveDirection("toggle"),
+        targetEffectiveFrom: getTodayLocalDate(),
         activeFrom: getTodayLocalDate(),
         metricMode: "derived",
         metricPublicId: "",
@@ -320,31 +338,34 @@ export function TrackerForm({
           // nobody has yet said anything about.
           { mode: "new", metric: { ...metric, defaultDirection: "higher_better" } };
 
-      await onSubmit({
-        tracker: {
-          name: value.name.trim(),
-          icon: value.icon,
-          manifest: {
-            control: tile.control,
-            // DEV_NOTE: the primary metric's key is added server-side — the Repo owns that
-            // invariant so it holds for every caller, not just this form.
-            metrics: [],
-            // DEV_NOTE: converted here and nowhere else on the way out — the API, the DB and every
-            // aggregate that reads them hold canonical units only (invariant 2). `displayUnit`
-            // travels beside them so the same numbers can be read back in the unit they were typed.
-            target:
-              value.target.trim() === "" ? null : toCanonical(Number(value.target), displayUnit),
-            step: value.step.trim() === "" ? null : toCanonical(Number(value.step), displayUnit),
-            direction: value.direction,
-            entryMode: value.entryMode,
-            schedule: buildSchedule(value),
-            compute: tile.compute,
-            displayUnit,
+      await onSubmit(
+        {
+          tracker: {
+            name: value.name.trim(),
+            icon: value.icon,
+            manifest: {
+              control: tile.control,
+              // DEV_NOTE: the primary metric's key is added server-side — the Repo owns that
+              // invariant so it holds for every caller, not just this form.
+              metrics: [],
+              // DEV_NOTE: converted here and nowhere else on the way out — the API, the DB and every
+              // aggregate that reads them hold canonical units only (invariant 2). `displayUnit`
+              // travels beside them so the same numbers can be read back in the unit they were typed.
+              target:
+                value.target.trim() === "" ? null : toCanonical(Number(value.target), displayUnit),
+              step: value.step.trim() === "" ? null : toCanonical(Number(value.step), displayUnit),
+              direction: value.direction,
+              entryMode: value.entryMode,
+              schedule: buildSchedule(value),
+              compute: tile.compute,
+              displayUnit,
+            },
+            activeFrom: value.activeFrom,
           },
-          activeFrom: value.activeFrom,
+          metric: metricSpec,
         },
-        metric: metricSpec,
-      });
+        { targetEffectiveFrom: value.targetEffectiveFrom },
+      );
     },
   });
 
@@ -711,6 +732,51 @@ export function TrackerForm({
                       </>
                     )}
                   </form.Field>
+
+                  {/* DEV_NOTE: only when editing, and only when the number above actually changed —
+                      a date asking "from when?" beside a target nobody touched is a question about
+                      nothing, and answering it would write an era identical to the one before it.
+                      Days before this date keep the target they were lived under; that is the whole
+                      point, and it's why the hint says so rather than leaving it to be discovered.  */}
+                  {isEditing && tracker !== undefined ? (
+                    <form.Subscribe
+                      selector={(state) => [state.values.target, state.values.displayUnit] as const}
+                    >
+                      {([typedTarget, typedUnit]) => {
+                        const unit = hasDisplayUnit ? typedUnit : null;
+                        const submitted =
+                          typedTarget.trim() === "" || Number.isNaN(Number(typedTarget))
+                            ? null
+                            : toCanonical(Number(typedTarget), unit);
+                        if (submitted === tracker.manifest.target) return null;
+
+                        return (
+                          <form.Field name="targetEffectiveFrom">
+                            {(dateField) => (
+                              <div className="mt-4 flex flex-col gap-2">
+                                <FieldLabelText htmlFor={dateField.name}>
+                                  New target applies from
+                                </FieldLabelText>
+                                <Input
+                                  id={dateField.name}
+                                  type="date"
+                                  value={dateField.state.value}
+                                  onChange={(event) => dateField.handleChange(event.target.value)}
+                                  onBlur={dateField.handleBlur}
+                                  className={UNDERLINE_INPUT}
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                  Days before this keep the target they were logged under. Backdate
+                                  it if you adopted this goal earlier than today.
+                                </span>
+                                <FieldError errors={dateField.state.meta.errors} />
+                              </div>
+                            )}
+                          </form.Field>
+                        );
+                      }}
+                    </form.Subscribe>
+                  ) : null}
                 </div>
               );
             }}

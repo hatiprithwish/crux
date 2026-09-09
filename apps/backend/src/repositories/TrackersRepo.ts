@@ -67,6 +67,37 @@ export default class TrackersRepo {
     return true;
   }
 
+  // --- target history --------------------------------------------------------------------------
+
+  // DEV_NOTE: the fix for "raising a target rescored every day I'd already lived". Scoring used to
+  // read `tracker.manifest.target` — the live value — for every day in the range, so a goal set
+  // today reached backwards and demoted a month of met days to partial. A target is a value *from
+  // a date*: this resolves which one was in force on the day being scored.
+  //
+  // DEV_NOTE: a day earlier than every row resolves to null, not to the oldest row, and null means
+  // "no target then" — which dayState already scores as met for any logged day. That is what makes
+  // the era before a user first set a goal read the way they actually lived it.
+  //
+  // Rows arrive ascending (TrackersDAL orders them), so the last one that has started is the one in
+  // force. Walked backwards because the recent end is where every read lands.
+  private resolveTargetAt(targets: Schemas.TrackerTarget[], localDate: string): number | null {
+    for (let index = targets.length - 1; index >= 0; index--) {
+      if (targets[index].effectiveFrom <= localDate) return targets[index].target;
+    }
+    return null;
+  }
+
+  private toTargetApiShape(target: Schemas.TrackerTarget): Schemas.TrackerTargetApiShape {
+    const {
+      id: _id,
+      userId: _userId,
+      trackerId: _trackerId,
+      deletedAt: _deletedAt,
+      ...rest
+    } = target;
+    return rest;
+  }
+
   // --- shared lookups --------------------------------------------------------------------------
 
   private async loadMetrics(userId: string): Promise<MetricLookup | null> {
@@ -243,6 +274,20 @@ export default class TrackersRepo {
       return { isSuccess: false, message: created.message };
     }
 
+    // DEV_NOTE: the tracker's first target era opens on the day it starts, carrying whatever the
+    // form said — including null, which is the correct row for a tracker created with no goal: it
+    // makes "there was no target then" a recorded fact rather than the absence of one, so a target
+    // added later stops at the day it was added instead of reaching back to the beginning.
+    const seeded = await this.trackersDal.createTrackerTarget({
+      userId: params.userId,
+      trackerId: created.tracker.id,
+      effectiveFrom: created.tracker.activeFrom,
+      target: created.tracker.manifest.target,
+    });
+    if (!seeded.isSuccess) {
+      return { isSuccess: false, message: seeded.message };
+    }
+
     const metrics = await this.loadMetrics(params.userId);
     if (!metrics) return { isSuccess: false, message: "Failed to load metrics" };
 
@@ -298,10 +343,57 @@ export default class TrackersRepo {
       }
     }
 
+    // DEV_NOTE: a changed target opens a new era rather than rewriting the tracker's history — the
+    // point of the whole table. Guarded on the value actually changing, so renaming a tracker or
+    // reshuffling its schedule writes no row, and re-saving the edit form unchanged is a no-op
+    // rather than a stack of identical eras.
+    //
+    // DEV_NOTE: the era is written BEFORE the tracker row, not after, because manifest.target is
+    // derived from the history rather than parallel to it (see below). Writing the tracker first
+    // and the era second would mean deciding what the current target is from a history that hasn't
+    // been written yet.
+    const targetChanged =
+      manifest !== undefined && manifest.target !== existing.tracker.manifest.target;
+    if (targetChanged) {
+      const written = await this.trackersDal.createTrackerTarget({
+        userId: params.userId,
+        trackerId: existing.tracker.id,
+        // Today unless the caller says otherwise — "I've decided to aim higher" is a statement
+        // about now. An explicit date is how a user backdates a goal they adopted before they got
+        // around to typing it in.
+        effectiveFrom: params.targetEffectiveFrom ?? this.todayLocalDate(),
+        target: manifest.target,
+      });
+      if (!written.isSuccess) {
+        return { isSuccess: false, message: written.message };
+      }
+    }
+
+    // DEV_NOTE: manifest.target still exists and still means "the target this tracker is aiming for
+    // today" — the eyebrow, the edit form and the quick-add widgets read it — but it is no longer
+    // what scores a day, and it is no longer simply what the request said. Backdating a goal to
+    // last June while a newer era already stands leaves today's target where it was, so the stored
+    // value is resolved from the history rather than copied from the patch. In the ordinary case
+    // (a new target from today) the two are the same number.
+    let manifestToWrite = manifest;
+    if (targetChanged) {
+      const history = await this.trackersDal.getTrackerTargets({
+        userId: params.userId,
+        trackerId: existing.tracker.id,
+      });
+      if (!history.isSuccess) {
+        return { isSuccess: false, message: history.message };
+      }
+      manifestToWrite = {
+        ...manifest,
+        target: this.resolveTargetAt(history.targets ?? [], this.todayLocalDate()),
+      };
+    }
+
     const updated = await this.trackersDal.updateTracker({
       userId: params.userId,
       publicId: params.publicId,
-      fields: { ...columns, ...(manifest ? { manifest } : {}) },
+      fields: { ...columns, ...(manifestToWrite ? { manifest: manifestToWrite } : {}) },
     });
     if (!updated.isSuccess || !updated.tracker) {
       return { isSuccess: false, message: updated.message };
@@ -312,6 +404,137 @@ export default class TrackersRepo {
       message: "Tracker updated successfully",
       tracker: this.toTrackerApiShape(updated.tracker, metrics),
     };
+  }
+
+  // --- target history --------------------------------------------------------------------------
+
+  async getTrackerTargets(params: {
+    userId: string;
+    publicId: string;
+  }): Promise<Schemas.GetTrackerTargetsApiResponse> {
+    const trackerResult = await this.trackersDal.getTracker(params);
+    if (!trackerResult.isSuccess || !trackerResult.tracker) {
+      return { isSuccess: false, message: trackerResult.message };
+    }
+
+    const result = await this.trackersDal.getTrackerTargets({
+      userId: params.userId,
+      trackerId: trackerResult.tracker.id,
+    });
+    if (!result.isSuccess) {
+      return { isSuccess: false, message: result.message };
+    }
+
+    return {
+      isSuccess: true,
+      message: "Targets fetched successfully",
+      targets: (result.targets ?? []).map((target) => this.toTargetApiShape(target)),
+    };
+  }
+
+  // DEV_NOTE: writing a row whose effectiveFrom is the newest in the history also updates
+  // manifest.target, because that field means "the tracker's current target" — the eyebrow, the
+  // edit form and every quick-add widget read it, and leaving it behind would have the page claim
+  // one goal while the heatmap scored another. A row written *into the past* touches nothing:
+  // correcting last month's history is not a statement about what the tracker aims for today.
+  async createTrackerTarget(
+    params: Schemas.CreateTrackerTargetApiRequest & { userId: string; publicId: string },
+  ): Promise<Schemas.WriteTrackerTargetApiResponse> {
+    const trackerResult = await this.trackersDal.getTracker({
+      userId: params.userId,
+      publicId: params.publicId,
+    });
+    if (!trackerResult.isSuccess || !trackerResult.tracker) {
+      return { isSuccess: false, message: trackerResult.message };
+    }
+    const tracker = trackerResult.tracker;
+
+    const written = await this.trackersDal.createTrackerTarget({
+      userId: params.userId,
+      trackerId: tracker.id,
+      effectiveFrom: params.target.effectiveFrom,
+      target: params.target.target,
+    });
+    if (!written.isSuccess) {
+      return { isSuccess: false, message: written.message };
+    }
+
+    const synced = await this.syncManifestTargetToHead(tracker);
+    if (!synced.isSuccess) return { isSuccess: false, message: synced.message };
+
+    return this.listTargets(params.userId, tracker.id, "Target saved successfully");
+  }
+
+  // DEV_NOTE: deleting a row removes an era boundary rather than a target — the days it covered
+  // fall back to whatever row precedes it, or to no target at all if it was the first. That is the
+  // undo for a boundary put in the wrong place, and it's why the row is addressed by its own
+  // publicId instead of by the date it starts.
+  async deleteTrackerTarget(params: {
+    userId: string;
+    publicId: string;
+    targetPublicId: string;
+  }): Promise<Schemas.WriteTrackerTargetApiResponse> {
+    const trackerResult = await this.trackersDal.getTracker({
+      userId: params.userId,
+      publicId: params.publicId,
+    });
+    if (!trackerResult.isSuccess || !trackerResult.tracker) {
+      return { isSuccess: false, message: trackerResult.message };
+    }
+    const tracker = trackerResult.tracker;
+
+    const deleted = await this.trackersDal.deleteTrackerTarget({
+      userId: params.userId,
+      trackerId: tracker.id,
+      publicId: params.targetPublicId,
+    });
+    if (!deleted.isSuccess) {
+      return { isSuccess: false, message: deleted.message };
+    }
+
+    const synced = await this.syncManifestTargetToHead(tracker);
+    if (!synced.isSuccess) return { isSuccess: false, message: synced.message };
+
+    return this.listTargets(params.userId, tracker.id, "Target deleted successfully");
+  }
+
+  private async listTargets(
+    userId: string,
+    trackerId: number,
+    message: string,
+  ): Promise<Schemas.WriteTrackerTargetApiResponse> {
+    const result = await this.trackersDal.getTrackerTargets({ userId, trackerId });
+    if (!result.isSuccess) {
+      return { isSuccess: false, message: result.message };
+    }
+
+    return {
+      isSuccess: true,
+      message,
+      targets: (result.targets ?? []).map((target) => this.toTargetApiShape(target)),
+    };
+  }
+
+  // DEV_NOTE: manifest.target is the current target, and "current" means the target in force today
+  // — so after any edit to the history it is re-read from the history rather than left holding
+  // whatever the last PATCH put there. A history that ends in the future deliberately doesn't win:
+  // resolveTargetAt(today) is what the tracker is aiming for right now.
+  private async syncManifestTargetToHead(tracker: Schemas.Tracker): Promise<Schemas.ApiResponse> {
+    const result = await this.trackersDal.getTrackerTargets({
+      userId: tracker.userId,
+      trackerId: tracker.id,
+    });
+    if (!result.isSuccess) return { isSuccess: false, message: result.message };
+
+    const current = this.resolveTargetAt(result.targets ?? [], this.todayLocalDate());
+    if (current === tracker.manifest.target) return { isSuccess: true };
+
+    const updated = await this.trackersDal.updateTracker({
+      userId: tracker.userId,
+      publicId: tracker.publicId,
+      fields: { manifest: { ...tracker.manifest, target: current } },
+    });
+    return { isSuccess: updated.isSuccess, message: updated.message };
   }
 
   // --- read ------------------------------------------------------------------------------------
@@ -343,15 +566,35 @@ export default class TrackersRepo {
     const windowStart = this.addDays(today, -(STREAK_WINDOW_DAYS - 1));
 
     // DEV_NOTE: one range scan for every tracker's primary metric — the Today screen renders N
-    // widgets off a single query rather than N round trips against a remote D1 binding.
-    const factsResult = await this.entriesDal.getDailyFactsForMetrics({
-      userId: params.userId,
-      metricIds: trackers.map((tracker) => tracker.primaryMetricId),
-      dateFrom: windowStart,
-      dateTo: today,
-    });
+    // widgets off a single query rather than N round trips against a remote D1 binding. The target
+    // histories come back the same way, for the same reason: computeStreak needs the goal that was
+    // in force on each day it walks, and N trackers must not become N extra queries.
+    const [factsResult, targetsResult] = await Promise.all([
+      this.entriesDal.getDailyFactsForMetrics({
+        userId: params.userId,
+        metricIds: trackers.map((tracker) => tracker.primaryMetricId),
+        dateFrom: windowStart,
+        dateTo: today,
+      }),
+      this.trackersDal.getTrackerTargetsForTrackers({
+        userId: params.userId,
+        trackerIds: trackers.map((tracker) => tracker.id),
+      }),
+    ]);
     if (!factsResult.isSuccess) {
       return { isSuccess: false, message: factsResult.message };
+    }
+    if (!targetsResult.isSuccess) {
+      return { isSuccess: false, message: targetsResult.message };
+    }
+
+    // Grouped per tracker; rows arrive already ascending by effectiveFrom, and grouping preserves
+    // that order, which is what resolveTargetAt walks.
+    const targetsByTracker = new Map<number, Schemas.TrackerTarget[]>();
+    for (const target of targetsResult.targets ?? []) {
+      const existing = targetsByTracker.get(target.trackerId);
+      if (existing) existing.push(target);
+      else targetsByTracker.set(target.trackerId, [target]);
     }
 
     // DEV_NOTE: the day's number is whatever the metric's default_agg says it is, not its sum —
@@ -383,7 +626,7 @@ export default class TrackersRepo {
         tracker: shapes[index],
         todaySum,
         todayCount: todaySum === null ? 0 : 1,
-        streak: this.computeStreak(sums, tracker, today),
+        streak: this.computeStreak(sums, tracker, targetsByTracker.get(tracker.id) ?? [], today),
         openSession,
       });
     }
@@ -603,12 +846,26 @@ export default class TrackersRepo {
         }),
     );
 
-    const target = tracker.manifest.target;
+    // DEV_NOTE: one query for the tracker's whole target history, then resolved per day in TS — the
+    // table holds a row per *change*, not per day, so this is a handful of rows however long the
+    // range is, and doing it per-day in SQL would be 364 lookups for the same answer.
+    const targetsResult = await this.trackersDal.getTrackerTargets({
+      userId: params.userId,
+      trackerId: tracker.id,
+    });
+    if (!targetsResult.isSuccess) {
+      return { isSuccess: false, message: targetsResult.message };
+    }
+    const targets = targetsResult.targets ?? [];
+
     const days: Schemas.TrackerHeatmapDay[] = [];
     for (let date = params.dateFrom; date <= params.dateTo; date = this.addDays(date, 1)) {
+      // DEV_NOTE: the day's own target travels with the day, which is what lets the client draw a
+      // target line that steps when the goal changed rather than one flat line at today's value.
+      const target = this.resolveTargetAt(targets, date);
       days.push({
         localDate: date,
-        state: this.dayState(date, sums, tracker),
+        state: this.dayState(date, sums, tracker, target),
         sum: sums.has(date) ? (sums.get(date) as number) : null,
         target,
       });
@@ -618,25 +875,32 @@ export default class TrackersRepo {
       isSuccess: true,
       message: "Heatmap fetched successfully",
       days,
-      streak: this.computeStreak(sums, tracker, this.todayLocalDate()),
+      streak: this.computeStreak(sums, tracker, targets, this.todayLocalDate()),
     };
   }
 
+  // DEV_NOTE: `target` is passed in rather than read off the manifest — it is the target that was in
+  // force on `localDate` (resolveTargetAt), not the one configured today. That parameter is the
+  // whole bug fix: everything else here is unchanged.
   private dayState(
     localDate: string,
     sums: Map<string, number>,
     tracker: Schemas.Tracker,
+    target: number | null,
   ): Schemas.TrackerDayState {
     if (localDate < tracker.activeFrom) return "not_active";
     if (!this.isScheduled(localDate, tracker.manifest.schedule)) return "not_scheduled";
     if (!sums.has(localDate)) return "no_data";
 
-    const target = tracker.manifest.target;
-    // DEV_NOTE: architecture.md §6 — "compare using `direction` and per-row `target_at_time`". A
+    // DEV_NOTE: architecture.md §6 — "compare using `direction` and the target in force". A
     // neutral tracker states there is no better side to be on, so a logged day is met and nothing
     // is scored against the target, exactly as a tracker with no target at all.
     // The ?? is for manifests written before direction moved onto them (migration 0004 backfills
     // the stored rows; this keeps an unmigrated read honest rather than crashing).
+    //
+    // DEV_NOTE: direction is read live, unlike the target. Raising a goal opens a new chapter, so
+    // the old one keeps its old bar; flipping direction says the number always meant the opposite
+    // of what was stored, and the honest response to a correction is to rescore what it got wrong.
     const direction = tracker.manifest.direction ?? "higher_better";
     if (target === null || direction === "neutral") return "met";
 
@@ -651,13 +915,17 @@ export default class TrackersRepo {
   private computeStreak(
     sums: Map<string, number>,
     tracker: Schemas.Tracker,
+    targets: Schemas.TrackerTarget[],
     today: string,
   ): number {
-    let streak = this.dayState(today, sums, tracker) === "met" ? 1 : 0;
+    const stateOn = (date: string) =>
+      this.dayState(date, sums, tracker, this.resolveTargetAt(targets, date));
+
+    let streak = stateOn(today) === "met" ? 1 : 0;
     let cursor = this.addDays(today, -1);
 
     while (cursor >= tracker.activeFrom) {
-      const state = this.dayState(cursor, sums, tracker);
+      const state = stateOn(cursor);
       if (state === "not_scheduled") {
         cursor = this.addDays(cursor, -1);
         continue;

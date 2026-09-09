@@ -9,6 +9,7 @@ import { TrackerBackfillPanel } from "../-TrackerBackfillPanel";
 import { TrackerDailyBars } from "../-TrackerDailyBars";
 import { TrackerEntryList } from "../-TrackerEntryList";
 import { deriveTrackerStats, TrackerStatStrip } from "../-TrackerStatStrip";
+import { TrackerTargetHistory } from "../-TrackerTargetHistory";
 import { TransferForm } from "../-TransferForm";
 import {
   addDaysToLocalDate,
@@ -76,6 +77,7 @@ function TrackerDetailPage() {
   const trackerQuery = useQuery(TrackersQueries.detail(trackerId, getToken));
   const heatmapQuery = useQuery(TrackersQueries.heatmap(trackerId, heatmapFrom, today, getToken));
   const entriesQuery = useQuery(TrackersQueries.entries(trackerId, breakdownFrom, today, getToken));
+  const targetsQuery = useQuery(TrackersQueries.targets(trackerId, getToken));
   const tracker = trackerQuery.data?.tracker;
   const isInterval = tracker?.manifest.control === "timer";
   // DEV_NOTE: a one-day slice rather than a filter over the 30-day log above — the backfill panel
@@ -231,8 +233,19 @@ function TrackerDetailPage() {
           ) : null}
 
           {heatmapQuery.isSuccess && tracker.manifest.control !== "toggle" ? (
-            <TrackerDailyBars days={days} metric={primaryMetric} target={tracker.manifest.target} />
+            <TrackerDailyBars days={days} metric={primaryMetric} />
           ) : null}
+
+          {/* DEV_NOTE: under the history it explains, not in the edit form. The edit form answers
+              "what am I aiming for", which is one number; this answers "what was I aiming for
+              then", which is the shape of the heatmap above it. */}
+          <TrackerTargetHistory
+            tracker={tracker}
+            metric={primaryMetric}
+            targets={targetsQuery.data?.targets ?? []}
+            isPending={targetsQuery.isPending}
+            isError={targetsQuery.isError}
+          />
 
           {tracker.manifest.compute === "money.transfer.v1" ? (
             <section>

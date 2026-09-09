@@ -847,6 +847,160 @@ describe("Trackers — manifest direction", () => {
   });
 });
 
+// DEV_NOTE: the bug this suite exists for — a target raised today used to be compared against every
+// day already logged, so a fortnight lived with no goal (or an easier one) was retroactively
+// demoted to "partial". A target is a value from a date; these assert that raising one leaves the
+// past exactly as it was lived.
+describe("Trackers — target history", () => {
+  let publicId: string;
+  const earlyDate = "2026-06-01";
+  const lateDate = "2026-06-20";
+  const targetSetOn = "2026-06-15";
+
+  async function heatmapDay(date: string): Promise<{ state: string; target: number | null }> {
+    const res = await worker.fetch(
+      makeRequest(`/trackers/${publicId}/heatmap?from=${date}&to=${date}`),
+      testEnv,
+      createExecutionContext(),
+    );
+    const body = (await res.json()) as {
+      days: { localDate: string; state: string; target: number | null }[];
+    };
+    const day = body.days.find((entry) => entry.localDate === date);
+    return { state: day?.state ?? "missing", target: day?.target ?? null };
+  }
+
+  async function logTotal(date: string, total: number) {
+    await worker.fetch(
+      makeRequest(`/trackers/${publicId}/entries`, "POST", {
+        payload: { control: "daily_total", date, total },
+      }),
+      testEnv,
+      createExecutionContext(),
+    );
+  }
+
+  beforeAll(async () => {
+    // Born with no target at all — the shape of a tracker someone starts logging before they've
+    // decided what "enough" is.
+    const created = await createTracker({
+      tracker: {
+        name: "Binge Watch",
+        manifest: {
+          control: "daily_total",
+          metrics: [],
+          target: null,
+          step: null,
+          direction: "higher_better",
+          entryMode: "retro",
+          schedule: { type: "daily" },
+          compute: null,
+        },
+        activeFrom: "2026-05-25",
+      },
+      metric: newMetricSpec(`target_history_${Date.now()}`),
+    });
+    publicId = created.publicId;
+
+    await logTotal(earlyDate, 60);
+    await logTotal(lateDate, 60);
+  });
+
+  afterAll(async () => {
+    await archiveTracker(publicId);
+  });
+
+  it("seeds an era at activeFrom on create, carrying the target the tracker was born with", async () => {
+    const res = await worker.fetch(
+      makeRequest(`/trackers/${publicId}/targets`),
+      testEnv,
+      createExecutionContext(),
+    );
+    const body = (await res.json()) as {
+      targets: { publicId: string; effectiveFrom: string; target: number | null }[];
+    };
+
+    expect(res.status).toBe(200);
+    expect(body.targets).toHaveLength(1);
+    expect(body.targets[0].effectiveFrom).toBe("2026-05-25");
+    expect(body.targets[0].target).toBeNull();
+    // No internal ids cross the boundary (invariant 11).
+    expect(body.targets[0]).not.toHaveProperty("id");
+    expect(body.targets[0]).not.toHaveProperty("trackerId");
+  });
+
+  it("a target added from a date leaves earlier days scored as they were lived", async () => {
+    // Both days logged 60 against no target, so both are met.
+    expect((await heatmapDay(earlyDate)).state).toBe("met");
+    expect((await heatmapDay(lateDate)).state).toBe("met");
+
+    const patched = await worker.fetch(
+      makeRequest(`/trackers/${publicId}`, "PATCH", {
+        tracker: { manifest: { target: 240 } },
+        targetEffectiveFrom: targetSetOn,
+      }),
+      testEnv,
+      createExecutionContext(),
+    );
+    expect(patched.status).toBe(200);
+
+    // The whole point: 1 June predates the goal, so it keeps its "met" and reports no target.
+    const early = await heatmapDay(earlyDate);
+    expect(early.state).toBe("met");
+    expect(early.target).toBeNull();
+
+    // 20 June is inside the new era — 60 against 240 is a real miss.
+    const late = await heatmapDay(lateDate);
+    expect(late.state).toBe("partial");
+    expect(late.target).toBe(240);
+  });
+
+  it("POSTing an era for a date already covered replaces it rather than stacking a second", async () => {
+    const first = await worker.fetch(
+      makeRequest(`/trackers/${publicId}/targets`, "POST", {
+        target: { effectiveFrom: targetSetOn, target: 30 },
+      }),
+      testEnv,
+      createExecutionContext(),
+    );
+    expect(first.status).toBe(201);
+
+    const body = (await first.json()) as {
+      targets: { effectiveFrom: string; target: number | null }[];
+    };
+    expect(body.targets.filter((row) => row.effectiveFrom === targetSetOn)).toHaveLength(1);
+    expect(body.targets.find((row) => row.effectiveFrom === targetSetOn)?.target).toBe(30);
+
+    // 60 clears a target of 30, so the late day is met again — the era was rewritten, not doubled.
+    expect((await heatmapDay(lateDate)).state).toBe("met");
+  });
+
+  it("deleting an era hands its days back to the one before it", async () => {
+    const listed = await worker.fetch(
+      makeRequest(`/trackers/${publicId}/targets`),
+      testEnv,
+      createExecutionContext(),
+    );
+    const { targets } = (await listed.json()) as {
+      targets: { publicId: string; effectiveFrom: string }[];
+    };
+    const era = targets.find((row) => row.effectiveFrom === targetSetOn);
+    expect(era).toBeDefined();
+
+    const deleted = await worker.fetch(
+      makeRequest(`/trackers/${publicId}/targets/${era?.publicId}`, "DELETE"),
+      testEnv,
+      createExecutionContext(),
+    );
+    expect(deleted.status).toBe(200);
+
+    // Back to the seeded no-target era that covers everything from activeFrom.
+    const late = await heatmapDay(lateDate);
+    expect(late.target).toBeNull();
+    expect(late.state).toBe("met");
+  });
+});
+
 describe("Trackers — heatmap + streak", () => {
   let ctx: ExecutionContext;
   let trackerPublicId: string;

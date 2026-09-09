@@ -6,6 +6,7 @@ import {
   ZTrackerMetricSpec,
 } from "./TrackersCommon";
 import { ZComputeInput } from "./ComputeCommon";
+import { ZTrackerTargetBase } from "./TrackerTargetsCommon";
 import { ZEntryRole } from "../core/DomainEnums";
 
 // DEV_NOTE: one create endpoint for every tracker, hardcoded domain or not — the manifest says what
@@ -46,6 +47,14 @@ export type UpdateTrackerManifest = z.infer<typeof ZUpdateTrackerManifest>;
 // DEV_NOTE: `activeTo` is absent because archive/unarchive own that column (TrackersDAL sets and
 // clears it in pairs with archivedAt) — an edit writing it directly would render a live tracker's
 // heatmap dead without archiving it.
+//
+// DEV_NOTE: `targetEffectiveFrom` is a sibling of `tracker`, not a manifest field, because it is
+// not part of the tracker's stored configuration — it says from which day the target in this
+// request starts counting, and the answer is written to tracker_targets rather than to
+// manifest_json. Absent means today, which is what "I've decided to aim higher" means when nobody
+// says otherwise; an explicit date is how a user says the new goal has been true since last Monday,
+// or corrects a goal they set weeks after they actually adopted it. Ignored unless the request
+// actually changes `manifest.target` — an edit that only renames the tracker opens no new chapter.
 export const ZUpdateTrackerApiRequest = z.object({
   tracker: ZTrackerBase.omit({ manifest: true, activeTo: true })
     .partial()
@@ -54,8 +63,21 @@ export const ZUpdateTrackerApiRequest = z.object({
     .refine((tracker) => Object.keys(tracker).length > 0, {
       message: "Provide at least one field to update",
     }),
+  targetEffectiveFrom: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 export type UpdateTrackerApiRequest = z.infer<typeof ZUpdateTrackerApiRequest>;
+
+// DEV_NOTE: the target history's own write surface, separate from PATCH /trackers/:publicId. The
+// PATCH covers the common case (change the goal, starting now); this covers editing the history
+// itself — adding the "no target before 12 Sept" row that makes a tracker's first fortnight honest,
+// or recording a goal that only held for one month of last year. Same table either way.
+export const ZCreateTrackerTargetApiRequest = z.object({
+  target: ZTrackerTargetBase,
+});
+export type CreateTrackerTargetApiRequest = z.infer<typeof ZCreateTrackerTargetApiRequest>;
 
 export const ZQuickAddApiRequest = z.object({
   payload: ZQuickAddPayload,

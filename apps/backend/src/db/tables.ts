@@ -155,6 +155,42 @@ export const trackers = table(
   ],
 );
 
+// DEV_NOTE: a tracker's goal over time, one row per change — see ZTrackerTargetsCommon for why
+// daily_facts.target_at_time (still unwritten, kept for the rollup shape it describes) could not
+// carry this: no tracker in its key, no row on unlogged days, and stamped at entry time so a
+// backfill would date-stamp an old day with today's goal. Rows are appended, never rewritten by a
+// new goal, so raising a target opens a new era instead of rescoring every day already lived.
+// `target` null = "no target from this date", which is how every tracker reads before its owner
+// first set one.
+export const trackerTargets = table(
+  "tracker_targets",
+  {
+    id: t.int().primaryKey(),
+    publicId: t.text("public_id").notNull(),
+    userId: t.text("user_id").notNull(),
+    trackerId: t.integer("tracker_id").notNull(),
+    effectiveFrom: t.text("effective_from").notNull(), // YYYY-MM-DD
+    target: t.real(), // canonical units, like manifest.target
+    createdAt: t.integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: t.integer("updated_at", { mode: "timestamp" }),
+    deletedAt: t.integer("deleted_at", { mode: "timestamp" }),
+  },
+  (table) => [
+    t.uniqueIndex("UNQ_tracker_targets_public_id").on(table.publicId),
+    // DEV_NOTE: partial, unlike the publicId index above — one tracker has exactly one target per
+    // day, but a soft-deleted row must not block setting a target for that date again (invariant 9
+    // keeps the row; it shouldn't also keep the date reserved).
+    t
+      .uniqueIndex("UNQ_tracker_targets_tracker_id_effective_from")
+      .on(table.trackerId, table.effectiveFrom)
+      .where(sql`${table.deletedAt} is null`),
+    t
+      .index("IDX_tracker_targets_tracker_id")
+      .on(table.trackerId, table.effectiveFrom)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
 // DEV_NOTE: entries is the append-mostly raw log — the source of truth. entry_values/entry_entities
 // (below) carry the actual readings/links; daily_facts is a derived, disposable cache written only
 // by EntriesDAL. See architecture.md §5 "entries".
@@ -243,7 +279,13 @@ export const dailyFacts = table(
     min: t.real(),
     max: t.real(),
     avg: t.real(),
-    targetAtTime: t.real("target_at_time"), // snapshot; keeps history honest when goals change
+    // DEV_NOTE: never written — always null. architecture.md §6 reserved it for "keeps history
+    // honest when goals change", and that job belongs to tracker_targets instead: this row's key
+    // has no tracker in it (two trackers on one metric would share the slot), it only exists on
+    // days something was logged, and it would be stamped at entry time, so backfilling August
+    // today would record today's goal against an August day. Kept as the column the doc describes;
+    // nothing reads it.
+    targetAtTime: t.real("target_at_time"),
     updatedAt: t.integer("updated_at", { mode: "timestamp" }).notNull(),
   },
   (table) => [

@@ -17,6 +17,7 @@ export class TrackersQueries {
     heatmap: (publicId: string) => ["trackers", publicId, "heatmap"] as const,
     breakdown: (publicId: string) => ["trackers", publicId, "breakdown"] as const,
     running: (publicId: string) => ["trackers", publicId, "running"] as const,
+    targets: (publicId: string) => ["trackers", publicId, "targets"] as const,
     timeline: (date: string) => ["trackers", "timeline", date] as const,
   };
 
@@ -112,6 +113,20 @@ export class TrackersQueries {
     });
   }
 
+  // DEV_NOTE: the tracker's goal over time, one row per change. Its own key rather than a slice of
+  // detail(), because it is invalidated by things the tracker row isn't (adding an era in the past
+  // changes no field on the tracker) and it invalidates things the tracker row doesn't (the heatmap
+  // rescores when an era boundary moves).
+  static targets(publicId: string, getToken: () => Promise<string | null>) {
+    return queryOptions({
+      queryKey: TrackersQueries.keys.targets(publicId),
+      queryFn: ({ signal }) =>
+        apiClient<Schemas.GetTrackerTargetsApiResponse>(`/trackers/${publicId}/targets`, getToken, {
+          signal,
+        }),
+    });
+  }
+
   // DEV_NOTE: backs the Today screen's ruler — one tick per entry logged today, across every
   // tracker. See docs/redesign-backlog.md for the read side's cross-tracker DEV_NOTE.
   static timeline(date: string, getToken: () => Promise<string | null>) {
@@ -171,6 +186,63 @@ export function useUpdateTracker() {
     },
     onError: () => {
       toast.error("Failed to update tracker. Please try again.");
+    },
+  });
+}
+
+// DEV_NOTE: both target-history mutations write the whole list back from the response rather than
+// refetching it — a write re-cuts the eras around it, and the server already returned the recut
+// history. detail() and the heatmap are invalidated on top: the heatmap rescores every day whose
+// era boundary moved, and the tracker's own manifest.target follows the newest era.
+function useTargetHistoryInvalidation() {
+  const queryClient = useQueryClient();
+
+  return async (publicId: string, response: Schemas.WriteTrackerTargetApiResponse) => {
+    if (response.targets) {
+      queryClient.setQueryData<Schemas.GetTrackerTargetsApiResponse>(
+        TrackersQueries.keys.targets(publicId),
+        { isSuccess: true, message: response.message, targets: response.targets },
+      );
+    }
+    await queryClient.invalidateQueries({ queryKey: TrackersQueries.keys.all() });
+  };
+}
+
+export function useCreateTrackerTarget() {
+  const { getToken } = useAuth();
+  const syncCache = useTargetHistoryInvalidation();
+
+  return useMutation({
+    mutationFn: ({ publicId, target }: { publicId: string; target: Schemas.TrackerTargetBase }) =>
+      apiClient<Schemas.WriteTrackerTargetApiResponse>(`/trackers/${publicId}/targets`, getToken, {
+        method: "POST",
+        body: JSON.stringify({ target }),
+      }),
+    onSuccess: async (response, { publicId }) => {
+      await syncCache(publicId, response);
+    },
+    onError: () => {
+      toast.error("Failed to save target. Please try again.");
+    },
+  });
+}
+
+export function useDeleteTrackerTarget() {
+  const { getToken } = useAuth();
+  const syncCache = useTargetHistoryInvalidation();
+
+  return useMutation({
+    mutationFn: ({ publicId, targetPublicId }: { publicId: string; targetPublicId: string }) =>
+      apiClient<Schemas.WriteTrackerTargetApiResponse>(
+        `/trackers/${publicId}/targets/${targetPublicId}`,
+        getToken,
+        { method: "DELETE" },
+      ),
+    onSuccess: async (response, { publicId }) => {
+      await syncCache(publicId, response);
+    },
+    onError: () => {
+      toast.error("Failed to remove target. Please try again.");
     },
   });
 }

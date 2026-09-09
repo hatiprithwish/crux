@@ -1,7 +1,7 @@
-import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import getDbClient from "@/db/dbClient";
-import { trackers } from "@/db/tables";
+import { trackers, trackerTargets } from "@/db/tables";
 import * as Schemas from "@app/schemas";
 import AppLogger from "@/providers/logger";
 import Utility from "@/utils/Utility";
@@ -399,6 +399,215 @@ export default class TrackersDAL {
       AppLogger.error({
         category: Schemas.LogCategory.DAL,
         action: Schemas.LogAction.DeleteTracker,
+        message,
+        error,
+        metadata: params,
+      });
+      response.message = message;
+    }
+
+    return response;
+  }
+
+  // --- target history --------------------------------------------------------------------------
+
+  // DEV_NOTE: an upsert on (tracker_id, effective_from), not a plain insert — "set a target from
+  // today" is an idempotent statement about a day, and a user who changes their mind twice in one
+  // afternoon is correcting today's row, not stacking a second one the unique index would reject.
+  // The whole point of this table is that yesterday's rows are immutable; today's is not yet
+  // history.
+  async createTrackerTarget(params: {
+    userId: string;
+    trackerId: number;
+    effectiveFrom: string;
+    target: number | null;
+  }) {
+    const response: Schemas.ApiResponse & { target?: Schemas.TrackerTarget } = { isSuccess: false };
+
+    try {
+      const now = new Date();
+      const [existing] = await this.db
+        .select()
+        .from(trackerTargets)
+        .where(
+          and(
+            eq(trackerTargets.trackerId, params.trackerId),
+            eq(trackerTargets.userId, params.userId),
+            eq(trackerTargets.effectiveFrom, params.effectiveFrom),
+            isNull(trackerTargets.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      const row = existing
+        ? await this.db
+            .update(trackerTargets)
+            .set({ target: params.target, updatedAt: now })
+            .where(eq(trackerTargets.id, existing.id))
+            .returning()
+            .get()
+        : await this.db
+            .insert(trackerTargets)
+            .values({
+              publicId: Utility.generatePublicId("trt_"),
+              userId: params.userId,
+              trackerId: params.trackerId,
+              effectiveFrom: params.effectiveFrom,
+              target: params.target,
+              createdAt: now,
+              updatedAt: null,
+            })
+            .returning()
+            .get();
+
+      response.isSuccess = true;
+      response.message = "Target saved successfully";
+      response.target = row;
+    } catch (error) {
+      const message = "Unknown error in saving tracker target";
+      AppLogger.error({
+        category: Schemas.LogCategory.DAL,
+        action: Schemas.LogAction.CreateTrackerTarget,
+        message,
+        error,
+        metadata: params,
+      });
+      response.message = message;
+    }
+
+    return response;
+  }
+
+  // DEV_NOTE: ascending by effectiveFrom, always the whole history — every caller resolves "the
+  // target on day D" by walking it, and a walk needs the rows in order. Small by construction: a
+  // row exists per target *change*, not per day.
+  async getTrackerTargets(params: { userId: string; trackerId: number }) {
+    const response: Schemas.ApiResponse & { targets?: Schemas.TrackerTarget[] } = {
+      isSuccess: false,
+    };
+
+    try {
+      const targets = await this.db
+        .select()
+        .from(trackerTargets)
+        .where(
+          and(
+            eq(trackerTargets.trackerId, params.trackerId),
+            eq(trackerTargets.userId, params.userId),
+            isNull(trackerTargets.deletedAt),
+          ),
+        )
+        .orderBy(asc(trackerTargets.effectiveFrom));
+
+      response.isSuccess = true;
+      response.message = "Targets fetched successfully";
+      response.targets = targets;
+    } catch (error) {
+      const message = "Unknown error in listing tracker targets";
+      AppLogger.error({
+        category: Schemas.LogCategory.DAL,
+        action: Schemas.LogAction.GetTrackerTargets,
+        message,
+        error,
+        metadata: params,
+      });
+      response.message = message;
+    }
+
+    return response;
+  }
+
+  // DEV_NOTE: the Today screen scores N trackers' streaks in one pass, so it needs every tracker's
+  // history in one query rather than N — the same reason getDailyFactsForMetrics exists. Internal,
+  // DAL-to-Repo, so taking ids is fine (invariant 11 is about the API boundary).
+  async getTrackerTargetsForTrackers(params: { userId: string; trackerIds: number[] }) {
+    const response: Schemas.ApiResponse & { targets?: Schemas.TrackerTarget[] } = {
+      isSuccess: false,
+    };
+
+    if (params.trackerIds.length === 0) {
+      response.isSuccess = true;
+      response.message = "Targets fetched successfully";
+      response.targets = [];
+      return response;
+    }
+
+    try {
+      // Chunked for D1's 100-bound-parameter cap — the list grows with the user's tracker count.
+      const targets: Schemas.TrackerTarget[] = [];
+      for (const ids of Utility.chunk(params.trackerIds)) {
+        const rows = await this.db
+          .select()
+          .from(trackerTargets)
+          .where(
+            and(
+              eq(trackerTargets.userId, params.userId),
+              inArray(trackerTargets.trackerId, ids),
+              isNull(trackerTargets.deletedAt),
+            ),
+          )
+          .orderBy(asc(trackerTargets.effectiveFrom));
+        targets.push(...rows);
+      }
+
+      response.isSuccess = true;
+      response.message = "Targets fetched successfully";
+      response.targets = targets;
+    } catch (error) {
+      const message = "Unknown error in listing tracker targets";
+      AppLogger.error({
+        category: Schemas.LogCategory.DAL,
+        action: Schemas.LogAction.GetTrackerTargets,
+        message,
+        error,
+        metadata: params,
+      });
+      response.message = message;
+    }
+
+    return response;
+  }
+
+  // DEV_NOTE: invariant 9 — soft delete only. Scoped by trackerId as well as userId so a publicId
+  // belonging to another tracker of the same user can't be deleted through this tracker's route.
+  async deleteTrackerTarget(params: { userId: string; trackerId: number; publicId: string }) {
+    const response: Schemas.ApiResponse = { isSuccess: false };
+
+    try {
+      const now = new Date();
+      const deleted = await this.db
+        .update(trackerTargets)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(
+          and(
+            eq(trackerTargets.publicId, params.publicId),
+            eq(trackerTargets.trackerId, params.trackerId),
+            eq(trackerTargets.userId, params.userId),
+            isNull(trackerTargets.deletedAt),
+          ),
+        )
+        .returning()
+        .get();
+
+      if (!deleted) {
+        const message = "Target not found";
+        AppLogger.error({
+          category: Schemas.LogCategory.DAL,
+          action: Schemas.LogAction.DeleteTrackerTarget,
+          message,
+          metadata: params,
+        });
+        response.message = message;
+        return response;
+      }
+
+      response.isSuccess = true;
+      response.message = "Target deleted successfully";
+    } catch (error) {
+      const message = "Unknown error in deleting tracker target";
+      AppLogger.error({
+        category: Schemas.LogCategory.DAL,
+        action: Schemas.LogAction.DeleteTrackerTarget,
         message,
         error,
         metadata: params,

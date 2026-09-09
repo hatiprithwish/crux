@@ -109,7 +109,12 @@ TrackersRoutes.patch(
     const body = c.req.valid("json");
 
     const repo = new TrackersRepo(c.env);
-    const response = await repo.updateTracker({ userId, publicId, tracker: body.tracker });
+    const response = await repo.updateTracker({
+      userId,
+      publicId,
+      tracker: body.tracker,
+      targetEffectiveFrom: body.targetEffectiveFrom,
+    });
 
     return c.json(response, response.isSuccess ? 200 : 404);
   },
@@ -212,6 +217,59 @@ TrackersRoutes.get(
 
     const repo = new TrackersRepo(c.env);
     const response = await repo.getRunningSession({ userId, publicId });
+
+    return c.json(response, response.isSuccess ? 200 : 404);
+  },
+);
+
+// DEV_NOTE: the target history's own surface, beside the PATCH that covers the common case. A
+// target is a value from a date (see TrackerTargetsCommon), so editing when a goal started is a
+// different act from editing the tracker, and it needs a route that can address one era.
+TrackersRoutes.get(
+  "/:publicId/targets",
+  checkAuth,
+  zValidator("param", ZPublicIdParam),
+  async (c) => {
+    const userId = c.get("clerkUserId");
+    const { publicId } = c.req.valid("param");
+
+    const repo = new TrackersRepo(c.env);
+    const response = await repo.getTrackerTargets({ userId, publicId });
+
+    return c.json(response, response.isSuccess ? 200 : 404);
+  },
+);
+
+// DEV_NOTE: POST, and idempotent on (tracker, effectiveFrom) — setting a target for a date the
+// history already covers replaces that era's value rather than failing on the unique index or
+// stacking a second row on the same day.
+TrackersRoutes.post(
+  "/:publicId/targets",
+  checkAuth,
+  zValidator("param", ZPublicIdParam),
+  zValidator("json", Schemas.ZCreateTrackerTargetApiRequest),
+  async (c) => {
+    const userId = c.get("clerkUserId");
+    const { publicId } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const repo = new TrackersRepo(c.env);
+    const response = await repo.createTrackerTarget({ userId, publicId, target: body.target });
+
+    return c.json(response, response.isSuccess ? 201 : 404);
+  },
+);
+
+TrackersRoutes.delete(
+  "/:publicId/targets/:targetPublicId",
+  checkAuth,
+  zValidator("param", ZPublicIdParam.extend({ targetPublicId: z.string() })),
+  async (c) => {
+    const userId = c.get("clerkUserId");
+    const { publicId, targetPublicId } = c.req.valid("param");
+
+    const repo = new TrackersRepo(c.env);
+    const response = await repo.deleteTrackerTarget({ userId, publicId, targetPublicId });
 
     return c.json(response, response.isSuccess ? 200 : 404);
   },

@@ -46,6 +46,11 @@ export enum LogAction {
   UnarchiveTracker = "UnarchiveTracker",
   DeleteTracker = "DeleteTracker",
 
+  // Substrate — tracker target history (a target is a value *from a date*, not one number)
+  CreateTrackerTarget = "CreateTrackerTarget",
+  GetTrackerTargets = "GetTrackerTargets",
+  DeleteTrackerTarget = "DeleteTrackerTarget",
+
   // Substrate — entries
   WriteEntry = "WriteEntry",
   GetEntries = "GetEntries",

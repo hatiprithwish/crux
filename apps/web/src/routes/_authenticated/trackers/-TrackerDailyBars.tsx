@@ -11,10 +11,14 @@ import { formatMetricValue } from "./-utils";
 // is the same height, which is the heatmap with extra steps.
 const BAR_WINDOW_DAYS = 14;
 
+// DEV_NOTE: the target is read off each day rather than passed in from the manifest. A tracker's
+// goal is a value *from a date* (TrackerTargetsCommon), so a window that straddles the day a target
+// changed has two of them in it — one flat line at today's value would draw days as under-target
+// that were met against the goal actually in force, which is the same lie the scoring path used to
+// tell. Each bar carries its own line segment, so the line steps where the goal did.
 interface TrackerDailyBarsProps {
   days: Schemas.TrackerHeatmapDay[];
   metric: Schemas.TrackerMetricDetail | null;
-  target: number | null;
 }
 
 function formatBarDate(localDate: string): string {
@@ -23,14 +27,21 @@ function formatBarDate(localDate: string): string {
     .toUpperCase();
 }
 
-export function TrackerDailyBars({ days, metric, target }: TrackerDailyBarsProps) {
+export function TrackerDailyBars({ days, metric }: TrackerDailyBarsProps) {
   const window = days.slice(-BAR_WINDOW_DAYS);
   const values = window.flatMap((day) => (day.sum === null ? [] : [day.sum]));
   if (values.length === 0) return null;
 
+  const targets = window.flatMap((day) => (day.target === null ? [] : [day.target]));
+  // The target in force on the last day in the window — what the header prints, since a header can
+  // only say one number and "what you are aiming for now" is the useful one.
+  const currentTarget = window[window.length - 1].target;
+
   // DEV_NOTE: the target is part of the scale, not just a line drawn over it — a run of days all
   // under target should look under target, which it can't if the tallest bar always fills the box.
-  const ceiling = Math.max(...values, target ?? 0);
+  // Every target in the window counts, not just the current one: a window containing a goal that
+  // was later lowered still has to fit the taller line.
+  const ceiling = Math.max(...values, ...targets, 0);
   if (ceiling <= 0) return null;
 
   return (
@@ -41,34 +52,46 @@ export function TrackerDailyBars({ days, metric, target }: TrackerDailyBarsProps
         </p>
         <p className="text-xs text-muted-foreground">
           {window.length} days
-          {target !== null && metric
-            ? ` · target ${formatMetricValue(target, metric.semanticType, metric.canonicalUnit)}`
+          {currentTarget !== null && metric
+            ? ` · target ${formatMetricValue(
+                currentTarget,
+                metric.semanticType,
+                metric.canonicalUnit,
+              )}`
             : ""}
         </p>
       </div>
 
       <div className="relative mx-6 mt-5 flex h-28 items-end gap-1.5">
-        {target !== null && target > 0 ? (
-          <div
-            className="pointer-events-none absolute inset-x-0 border-t border-dashed border-border"
-            style={{ bottom: `${(target / ceiling) * 100}%` }}
-            aria-hidden
-          />
-        ) : null}
-
         {window.map((day) => {
           const height = day.sum === null ? 0 : (day.sum / ceiling) * 100;
+          const describeDay =
+            day.sum === null || !metric
+              ? "nothing logged"
+              : formatMetricValue(day.sum, metric.semanticType, metric.canonicalUnit);
+          const describeTarget =
+            day.target === null || !metric
+              ? "no target"
+              : `target ${formatMetricValue(day.target, metric.semanticType, metric.canonicalUnit)}`;
 
           return (
             <div
               key={day.localDate}
-              className="flex h-full flex-1 items-end"
-              title={`${Utilities.formatFullDate(day.localDate)} — ${
-                day.sum === null || !metric
-                  ? "nothing logged"
-                  : formatMetricValue(day.sum, metric.semanticType, metric.canonicalUnit)
-              }`}
+              className="relative flex h-full flex-1 items-end"
+              title={`${Utilities.formatFullDate(day.localDate)} — ${describeDay} · ${describeTarget}`}
             >
+              {/* DEV_NOTE: one segment per day rather than one line across the panel, so the target
+                  steps on the day the goal changed instead of pretending today's applied all along.
+                  Drawn inside the day's own column, which is what makes the step land in the gap
+                  between two bars rather than through one of them. */}
+              {day.target !== null && day.target > 0 ? (
+                <div
+                  className="pointer-events-none absolute inset-x-0 border-t border-dashed border-border"
+                  style={{ bottom: `${(day.target / ceiling) * 100}%` }}
+                  aria-hidden
+                />
+              ) : null}
+
               {/* A day with nothing logged keeps its slot as a hairline rather than a zero-height
                   gap — an absent day and a small day must not look identical (invariant 7). */}
               <div

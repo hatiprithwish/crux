@@ -57,10 +57,15 @@ function EditTrackerPage() {
           // what a PATCH may carry. The manifest fields dropped here (control, metrics, compute)
           // are exactly the ones the API refuses to read, so sending them would be noise the
           // strict schema rejects rather than a silent no-op.
-          onSubmit={async (value) => {
+          onSubmit={async (value, meta) => {
             await updateTracker.mutateAsync({
               publicId: tracker.publicId,
               body: {
+                // DEV_NOTE: a sibling of `tracker`, not a manifest field — it says from which day
+                // the target below starts being what days are scored against, and the backend
+                // writes it to the target history rather than to manifest_json. Ignored there
+                // unless the target actually changed, so sending it always is safe.
+                targetEffectiveFrom: meta.targetEffectiveFrom,
                 tracker: {
                   name: value.tracker.name,
                   icon: value.tracker.icon,

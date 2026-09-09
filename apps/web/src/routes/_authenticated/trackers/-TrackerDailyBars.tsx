@@ -1,7 +1,8 @@
 import type * as Schemas from "@app/schemas";
 import { cn } from "@/utils/tailwind";
-import Utilities from "@/utils";
-import { formatMetricValue } from "./-utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip";
+import { formatDayLabel, formatMetricValue } from "./-utils";
+import TrackerDayTooltip from "./-TrackerDayTooltip";
 
 // DEV_NOTE: design/tracker-detail-mobile.png's "MINUTES PER DAY" panel. The heatmap answers "did I
 // do it"; this answers "how much", which a five-state colour scale structurally cannot. Both read
@@ -69,40 +70,49 @@ export function TrackerDailyBars({ days, metric }: TrackerDailyBarsProps) {
             day.sum === null || !metric
               ? "nothing logged"
               : formatMetricValue(day.sum, metric.semanticType, metric.canonicalUnit);
-          const describeTarget =
-            day.target === null || !metric
-              ? "no target"
-              : `target ${formatMetricValue(day.target, metric.semanticType, metric.canonicalUnit)}`;
 
           return (
-            <div
-              key={day.localDate}
-              className="relative flex h-full flex-1 items-end"
-              title={`${Utilities.formatFullDate(day.localDate)} — ${describeDay} · ${describeTarget}`}
-            >
-              {/* DEV_NOTE: one segment per day rather than one line across the panel, so the target
-                  steps on the day the goal changed instead of pretending today's applied all along.
-                  Drawn inside the day's own column, which is what makes the step land in the gap
-                  between two bars rather than through one of them. */}
-              {day.target !== null && day.target > 0 ? (
+            <Tooltip key={day.localDate}>
+              {/* DEV_NOTE: the whole column is the hover target, not the bar — a 2px hairline for a
+                  day with nothing logged is the day a reader most wants to hover and the one they
+                  could never hit. Tabbable for the same reason the heatmap's cells are: the tooltip
+                  is the only place these numbers are written down. */}
+              <TooltipTrigger asChild>
                 <div
-                  className="pointer-events-none absolute inset-x-0 border-t border-dashed border-border"
-                  style={{ bottom: `${(day.target / ceiling) * 100}%` }}
-                  aria-hidden
-                />
-              ) : null}
+                  className="relative flex h-full flex-1 items-end rounded-xs transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  tabIndex={0}
+                  role="img"
+                  aria-label={`${formatDayLabel(day.localDate)} — ${describeDay}`}
+                >
+                  {/* DEV_NOTE: one segment per day rather than one line across the panel, so the
+                      target steps on the day the goal changed instead of pretending today's applied
+                      all along. Drawn inside the day's own column, which is what makes the step land
+                      in the gap between two bars rather than through one of them. */}
+                  {day.target !== null && day.target > 0 ? (
+                    <div
+                      className="pointer-events-none absolute inset-x-0 border-t border-dashed border-border"
+                      style={{ bottom: `${(day.target / ceiling) * 100}%` }}
+                      aria-hidden
+                    />
+                  ) : null}
 
-              {/* A day with nothing logged keeps its slot as a hairline rather than a zero-height
-                  gap — an absent day and a small day must not look identical (invariant 7). */}
-              <div
-                className={cn(
-                  "w-full rounded-xs",
-                  day.state === "met" ? "bg-foreground" : "bg-muted-foreground/50",
-                  day.sum === null && "bg-border",
-                )}
-                style={{ height: day.sum === null ? "2px" : `${Math.max(height, 2)}%` }}
-              />
-            </div>
+                  {/* A day with nothing logged keeps its slot as a hairline rather than a
+                      zero-height gap — an absent day and a small day must not look identical
+                      (invariant 7). */}
+                  <div
+                    className={cn(
+                      "w-full rounded-xs",
+                      day.state === "met" ? "bg-foreground" : "bg-muted-foreground/50",
+                      day.sum === null && "bg-border",
+                    )}
+                    style={{ height: day.sum === null ? "2px" : `${Math.max(height, 2)}%` }}
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="flex-col items-stretch">
+                <TrackerDayTooltip day={day} metric={metric} />
+              </TooltipContent>
+            </Tooltip>
           );
         })}
       </div>

@@ -1,7 +1,8 @@
 import type * as Schemas from "@app/schemas";
 import { cn } from "@/utils/tailwind";
-import Utilities from "@/utils";
-import { addDaysToLocalDate, dayOfWeek } from "./-utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip";
+import { addDaysToLocalDate, dayOfWeek, formatDayLabel, formatMetricValue } from "./-utils";
+import TrackerDayTooltip from "./-TrackerDayTooltip";
 
 // DEV_NOTE: architecture.md §6 — grid position is client-side arithmetic over a server-supplied day
 // list; the server decides the state (it owns the schedule and target). Five states, and none of
@@ -40,6 +41,10 @@ const WEEKDAY_ROWS = [
 
 interface TrackerHeatmapProps {
   days: Schemas.TrackerHeatmapDay[];
+  // DEV_NOTE: only for reading a day's number out loud on hover — the grid's five colours never
+  // depend on it. Nullable because a tracker's primary metric can be missing from the manifest's
+  // details, in which case the tooltip says what happened without saying how much.
+  metric: Schemas.TrackerMetricDetail | null;
   // Explains the blank cells at the start of the grid, when the window reaches back past the day
   // the tracker began. Rendered here rather than by the caller so it sits inside the section's own
   // rule instead of adding a second one under it.
@@ -64,6 +69,7 @@ function formatMonth(localDate: string): string {
 
 export default function TrackerHeatmap({
   days,
+  metric,
   note,
   onSelectDay,
   selectedDate,
@@ -115,37 +121,57 @@ export default function TrackerHeatmap({
             <div key={`blank-${paddingDate}`} className="h-4 w-full rounded-xs" />
           ))}
           {days.map((day) => {
-            const description = `${Utilities.formatFullDate(day.localDate)} — ${STATE_LABELS[day.state]}${
-              day.sum !== null
-                ? ` (${day.sum}${day.target !== null ? ` / ${day.target}` : ""})`
-                : ""
-            }`;
             const className = `h-4 w-full rounded-xs ${STATE_CLASSES[day.state]}`;
 
-            // A day before the tracker existed has nothing to log against — it is padding with a
-            // date, not a cell.
-            if (!onSelectDay || day.state === "not_active") {
-              return <div key={day.localDate} className={className} title={description} />;
+            // A day before the tracker existed has nothing to log against and nothing to say — it is
+            // padding with a date, not a cell, so it gets no tooltip either.
+            if (day.state === "not_active") {
+              return <div key={day.localDate} className={className} />;
             }
 
+            // DEV_NOTE: the same sentence the tooltip renders, flattened for a screen reader — the
+            // tooltip's own content is announced too, but only once focus reaches the cell, and a
+            // cell with no accessible name is unreachable by name in the first place.
+            const label = `${formatDayLabel(day.localDate)} — ${STATE_LABELS[day.state]}${
+              day.sum !== null && metric
+                ? `, ${formatMetricValue(day.sum, metric.semanticType, metric.canonicalUnit)}`
+                : ""
+            }`;
+            const canLog = Boolean(onSelectDay);
+
             return (
-              <button
-                key={day.localDate}
-                type="button"
-                onClick={() => onSelectDay(day.localDate)}
-                // DEV_NOTE: the ring sits outside the cell (offset) rather than inside it — a
-                // 16px-tall square with an inset ring reads as a different *state*, and the five
-                // states are the only thing colour is allowed to mean in this grid.
-                className={cn(
-                  className,
-                  "cursor-pointer transition-transform hover:scale-125 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background focus-visible:outline-none",
-                  selectedDate === day.localDate &&
-                    "ring-2 ring-primary ring-offset-1 ring-offset-background",
-                )}
-                title={description}
-                aria-label={`Log ${description}`}
-                aria-pressed={selectedDate === day.localDate}
-              />
+              <Tooltip key={day.localDate}>
+                <TooltipTrigger asChild>
+                  {canLog ? (
+                    <button
+                      type="button"
+                      onClick={() => onSelectDay?.(day.localDate)}
+                      // DEV_NOTE: the ring sits outside the cell (offset) rather than inside it — a
+                      // 16px-tall square with an inset ring reads as a different *state*, and the
+                      // five states are the only thing colour is allowed to mean in this grid.
+                      className={cn(
+                        className,
+                        "cursor-pointer transition-transform hover:scale-125 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background focus-visible:outline-none",
+                        selectedDate === day.localDate &&
+                          "ring-2 ring-primary ring-offset-1 ring-offset-background",
+                      )}
+                      aria-label={`Log ${label}`}
+                      aria-pressed={selectedDate === day.localDate}
+                    />
+                  ) : (
+                    // A read-only cell is still hoverable, and tabbable so the tooltip is reachable
+                    // without a mouse — it just has nothing to do when activated.
+                    <div className={className} tabIndex={0} role="img" aria-label={label} />
+                  )}
+                </TooltipTrigger>
+                <TooltipContent className="flex-col items-stretch">
+                  <TrackerDayTooltip
+                    day={day}
+                    metric={metric}
+                    hint={canLog ? "Click to log this day" : undefined}
+                  />
+                </TooltipContent>
+              </Tooltip>
             );
           })}
         </div>

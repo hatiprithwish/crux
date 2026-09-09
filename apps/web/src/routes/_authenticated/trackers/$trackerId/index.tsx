@@ -214,6 +214,7 @@ function TrackerDetailPage() {
             ) : (
               <TrackerHeatmap
                 days={days}
+                metric={primaryMetric}
                 note={heatmapNote}
                 onSelectDay={canBackfill ? setSelectedDate : undefined}
                 selectedDate={selectedDate}

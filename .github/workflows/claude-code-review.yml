@@ -1,8 +1,8 @@
 name: Claude Code Review
 
-# Plugin-based automated code review on every PR
-# Uses anthropics/claude-code-plugins "code-review" plugin via GitHub Action
-# Auth: CLAUDE_CODE_OAUTH_TOKEN (Pro plan usage, not pay-per-token API)
+# Automated PR review: runs the generic anthropics/claude-code-plugins "code-review" plugin,
+# then a project-specific pattern enforcer checking the diff against .github/pattern-rules.md
+# (CLAUDE.md rules + custom rules). Auth: CLAUDE_CODE_OAUTH_TOKEN (Pro plan usage, not pay-per-token API)
 
 on:
   pull_request:
@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
@@ -32,3 +32,114 @@ jobs:
           plugins: "code-review@claude-code-plugins"
           prompt: "/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
           claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment"'
+
+      - name: Run Pattern Enforcement
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            You are a code pattern enforcer specialized in validating PRs against project standards.
+
+            TASK:
+            1. Read .github/pattern-rules.md to understand all enforced patterns (CLAUDE.md rules + custom rules)
+            2. Get the PR diff using `gh pr diff`
+            3. Analyze ONLY the added/modified lines for pattern violations
+            4. For each violation:
+               - Identify file, line number, and exact code
+               - Determine which rule is violated
+               - Classify severity: CRITICAL, WARNING, or INFO
+               - Generate specific, actionable fix suggestion
+            5. Post ONE inline PR comment per violation
+            6. After all violation comments, post a summary comment
+
+            CRITICAL PRINCIPLE: DIFF-ONLY ANALYSIS
+            - You MUST analyze only the PR diff
+            - Do NOT read entire files
+            - Do NOT scan the whole codebase
+            - Focus on added/modified lines only (lines with + in diff)
+            - This keeps analysis token-efficient
+
+            SCOPE: only run these checks if the diff touches apps/web/src, apps/backend/src, or
+            packages/schemas/src TypeScript/TSX/JS/JSX files. If it doesn't, skip straight to
+            posting "✅ Pattern check skipped — no matching files in this diff." and stop.
+
+            VIOLATION COMMENT FORMAT:
+            Use this exact format for each violation:
+            ```
+            gh pr comment ${{ github.event.pull_request.number }} --body "🔴 [CRITICAL] | Rule: Layer Boundaries
+
+            **Issue:** Routes are importing directly from Drizzle, skipping the Repo layer.
+
+            **Location:** \`apps/backend/src/routes/NotesRoutes.ts\` (line XX)
+
+            **Current Code:**
+            \`\`\`typescript
+            import { drizzle } from 'drizzle-orm'
+            \`\`\`
+
+            **Fix:**
+            \`\`\`typescript
+            // Remove drizzle import
+            // Import the Repo instead:
+            import { NotesRepo } from '../repositories'
+            \`\`\`
+
+            **See Rule:** [Layer Boundary Violations § 1.1](https://github.com/${{ github.repository }}/blob/main/.github/pattern-rules.md#11-layer-boundary-violations-critical)"
+            ```
+
+            SUMMARY COMMENT FORMAT (after all violations):
+            ```
+            gh pr comment ${{ github.event.pull_request.number }} --body "## Pattern Check Summary
+
+            Total violations: 3
+            - 🔴 Critical: 2 (must fix before merge)
+            - 🟡 Warnings: 1 (should fix)
+            - 🔵 Info: 0
+
+            Review inline comments for details and fixes.
+            See .github/pattern-rules.md for all rules."
+            ```
+
+            RULES TO CHECK:
+            Read .github/pattern-rules.md and check for:
+
+            SECTION 1 - CLAUDE.MD RULES:
+            1.1 Layer boundaries (Routes→Repo→DAL→DB)
+            1.2 Type definitions must be in packages/schemas
+            1.3 console.log forbidden (use AppLogger)
+            1.4 Type safety (no any, no @ts-ignore)
+            1.5 Import path consistency
+            1.6 DB schema changes need migrations
+            1.7 Correct file placement per architecture
+            1.8 Naming conventions (PascalCase, camelCase, snake_case)
+            1.9 DAL error handling & logging
+            1.10 Mutation error handling (onError required)
+            1.11 Styling (Tailwind only, no inline styles except dynamic)
+
+            SECTION 2 - CUSTOM RULES:
+            2.1 Tailwind hard-coded pixels (px-[12px] forbidden, use standard scale)
+            2.2 Design system colors (no hardcoded hex, use color scale)
+
+            ANALYSIS STEPS:
+            1. Get PR diff: `gh pr diff ${{ github.event.pull_request.number }}`
+            2. For each file in the diff:
+               - Read the file to understand context
+               - Look at only the added/modified lines (+)
+               - Check against each rule
+               - Flag violations with specific line numbers
+            3. Post comments for violations
+            4. Post summary
+
+            OUTPUT:
+            - One comment per violation
+            - Include severity, rule name, location, current code, fix, link to rule
+            - Summary comment at the end with count
+            - If NO violations, post: "✅ Pattern check passed! All rules satisfied."
+
+          claude_args: |
+            --allowedTools Write,Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(rg:*),Bash(grep:*)

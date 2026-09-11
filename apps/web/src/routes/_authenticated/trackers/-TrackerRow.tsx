@@ -56,19 +56,22 @@ export default function TrackerRow({ today }: TrackerRowProps) {
         // px-6 matches every other section on the screen — the row is the page's content now, not
         // a card inside a centred column. Name and control share one line (design/today-web.png) —
         // editing/archiving a tracker is the management list's job (/trackers/all), not this row's.
-        "flex items-center justify-between gap-4 border-b border-border px-6 py-4",
+        // flex-wrap is the fallback for a control too wide for a narrow phone (a timer's label
+        // field, an amount pad's three inputs) — it drops to its own line instead of forcing the
+        // whole page into horizontal scroll.
+        "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border px-6 py-4",
         isRunning && "border-l-2 border-l-primary bg-primary/5 pl-5.5",
       )}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         {/* DEV_NOTE: the slot is rendered whether or not the tracker has an icon, so every name
             in the list starts at the same x — a list where only some rows are indented is harder
             to scan than one with no icons at all. */}
         <div className="flex size-8 shrink-0 items-center justify-center rounded-sm border border-border text-base">
           {tracker.icon}
         </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-base font-medium">
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="truncate text-base font-medium">
             {/* DEV_NOTE: underlined on hover because it is a link to the history screen — the
                 only path there now that the row no longer duplicates it as a button. */}
             <Link
@@ -79,7 +82,7 @@ export default function TrackerRow({ today }: TrackerRowProps) {
               {tracker.name}
             </Link>
           </span>
-          <span className="text-xs text-muted-foreground">
+          <span className="truncate text-xs text-muted-foreground">
             {describeSchedule(tracker.manifest.schedule)}
             {today.streak > 0 ? ` · ${today.streak} day streak` : ""}
           </span>

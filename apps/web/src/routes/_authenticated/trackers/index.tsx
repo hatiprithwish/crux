@@ -103,7 +103,7 @@ function TrackersPage() {
   // right-hand insight panels design/today-web.png shows will drop into the space beside them when
   // the surface backing them exists (see docs/redesign-backlog.md).
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-dvh flex-col">
       <header className="flex items-start justify-between gap-4 border-b border-border px-6 py-8">
         <div className="flex flex-col gap-1">
           <p className="text-xs font-medium tracking-widest text-muted-foreground uppercase">

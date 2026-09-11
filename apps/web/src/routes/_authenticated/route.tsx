@@ -35,9 +35,13 @@ function AuthenticatedLayout() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    // DEV_NOTE: min-h-dvh, not min-h-screen — 100vh on a mobile browser measures past the
+    // address bar into space the user can't see, so the fixed bottom nav (AppBottomNav) ended up
+    // pinned below the visible viewport until the chrome collapsed on scroll. dvh tracks the
+    // viewport that's actually on screen.
+    <div className="flex min-h-dvh">
       <AppSidebar />
-      <main className="min-w-0 flex-1 pb-14 md:pb-0">
+      <main className="min-w-0 flex-1 overflow-x-hidden pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
         <Outlet />
       </main>
       <AppBottomNav />

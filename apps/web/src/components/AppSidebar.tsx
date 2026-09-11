@@ -94,7 +94,7 @@ export function AppSidebar() {
     // so a sidebar sized by the flex row grows with the tallest screen's content and takes its
     // footer — Archived and the user button — below the fold. Pinned to the viewport instead, the
     // footer is always reachable and the nav takes its own scrollbar if the list ever outgrows it.
-    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
+    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
       <div className="shrink-0 px-5 pt-6 pb-4">
         <p className="font-heading text-xl font-bold text-sidebar-foreground">Crux</p>
         {dayNumber !== null && (
@@ -141,7 +141,7 @@ export function AppBottomNav() {
   const pathname = routerState.location.pathname;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-10 flex border-t border-sidebar-border bg-sidebar md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-10 flex border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] md:hidden">
       {PRIMARY_NAV.map((item) => (
         <Link
           key={item.to}

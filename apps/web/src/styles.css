@@ -6,6 +6,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* DEV_NOTE: safety net, not the fix — a row that's still too wide for its viewport (a stray
+   fixed-width control, a long unbroken tracker name) should clip rather than open a page-wide
+   horizontal scrollbar on mobile. */
+html,
+body {
+  overflow-x: hidden;
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: "IBM Plex Sans Variable", sans-serif;

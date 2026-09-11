@@ -9,6 +9,16 @@
     "ALLOWED_CORS_ORIGIN": "http://localhost:3000",
     // DEV_NOTE: "local" is the only value that enables the checkAuth bypass in AuthMiddleware.ts — must be an exact match, staging/production below override this.
     "APP_ENV": "local",
+    // DEV_NOTE: VAPID_PUBLIC_KEY/VAPID_SUBJECT are plain vars, not secrets — a public key has nothing
+    // to protect (it's served to every browser via GET /notifications/vapid-public-key and handed to
+    // pushManager.subscribe()), and VAPID_SUBJECT is just a contact mailto:. Only VAPID_PRIVATE_KEY
+    // is a secret (.dev.vars locally, `wrangler secret put` in staging/production).
+    // Same value in every env block below deliberately — staging/production/local share one physical
+    // D1 (see the d1_databases DEV_NOTE), so push_subscriptions is one shared table: a subscription
+    // created under one public key can only ever be signed for by its matching private key, so every
+    // environment has to run the same VAPID identity or sends start failing with a silent 401.
+    "VAPID_PUBLIC_KEY": "BG2-5T2DP7LLQOdb9mjyJge7iOoMuJjxz4vN4pTWg2NJMA9H1_KvN2z6T0QKBoQkDNOR_cwUStX-mg3geMaUjXY",
+    "VAPID_SUBJECT": "mailto:hatiprithwish@gmail.com",
   },
   "observability": {
     "logs": {
@@ -31,6 +41,8 @@
       "vars": {
         "ALLOWED_CORS_ORIGIN": "http://localhost:3000,https://crux-web-staging.hatiprithwish.workers.dev",
         "APP_ENV": "staging",
+        "VAPID_PUBLIC_KEY": "BG2-5T2DP7LLQOdb9mjyJge7iOoMuJjxz4vN4pTWg2NJMA9H1_KvN2z6T0QKBoQkDNOR_cwUStX-mg3geMaUjXY",
+        "VAPID_SUBJECT": "mailto:hatiprithwish@gmail.com",
       },
       "observability": {
         "logs": {
@@ -53,6 +65,8 @@
       "vars": {
         "ALLOWED_CORS_ORIGIN": "https://crux-web.hatiprithwish.workers.dev",
         "APP_ENV": "production",
+        "VAPID_PUBLIC_KEY": "BG2-5T2DP7LLQOdb9mjyJge7iOoMuJjxz4vN4pTWg2NJMA9H1_KvN2z6T0QKBoQkDNOR_cwUStX-mg3geMaUjXY",
+        "VAPID_SUBJECT": "mailto:hatiprithwish@gmail.com",
       },
       "observability": {
         "logs": {

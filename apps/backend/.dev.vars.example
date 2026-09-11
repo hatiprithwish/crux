@@ -16,3 +16,7 @@ CLOUDFLARE_API_TOKEN=   # ci-required
 CLOUDFLARE_ACCOUNT_ID=  # ci-required
 
 DEV_USER_ID=            # local-only — dev identity used by the APP_ENV=local auth bypass, never set in staging/production
+
+VAPID_PUBLIC_KEY=       # runtime-only — generate a pair with: node -e '(async()=>{const{webcrypto:c}=await import("node:crypto");const k=await c.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]);console.log("VAPID_PUBLIC_KEY="+Buffer.from(await c.subtle.exportKey("raw",k.publicKey)).toString("base64url"));console.log("VAPID_PRIVATE_KEY="+(await c.subtle.exportKey("jwk",k.privateKey)).d);})()'
+VAPID_PRIVATE_KEY=      # runtime-only — the `d` component from the same generation, regenerate together as a pair
+VAPID_SUBJECT=          # runtime-only — a mailto: or https: URL the push service can contact if it needs to reach the sender

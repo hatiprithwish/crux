@@ -1,0 +1,7 @@
+version: 2
+
+secret:
+  # RFC 8291 Appendix A test vectors + WebCrypto-generated throwaway keypairs used
+  # only inside tests — no real credential ever lives here.
+  ignored-paths:
+    - apps/backend/src/tests/webPush.test.ts

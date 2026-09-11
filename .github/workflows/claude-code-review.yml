@@ -1,17 +1,12 @@
-name: Pattern Enforcer
+name: Claude Code Review
 
-# Automated validation of code patterns against project standards
-# Runs on every PR, posts inline comments for violations
-# Uses .github/pattern-rules.md as the source of truth for checks
-# Token-efficient: analyzes only PR diff, not entire codebase
+# Automated PR review: runs the generic anthropics/claude-code-plugins "code-review" plugin,
+# then a project-specific pattern enforcer checking the diff against .github/pattern-rules.md
+# (CLAUDE.md rules + custom rules). Auth: CLAUDE_CODE_OAUTH_TOKEN (Pro plan usage, not pay-per-token API)
 
 on:
   pull_request:
-    types: [opened, synchronize]
-    paths:
-      - "apps/web/src/**/*.{ts,tsx,js,jsx}"
-      - "apps/backend/src/**/*.{ts,tsx,js,jsx}"
-      - "packages/schemas/src/**/*.{ts,tsx,js,jsx}"
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -19,13 +14,24 @@ permissions:
   id-token: write
 
 jobs:
-  validate-patterns:
+  code-review:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+
+      - name: Run Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
+          plugins: "code-review@claude-code-plugins"
+          prompt: "/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+          claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment"'
 
       - name: Run Pattern Enforcement
         uses: anthropics/claude-code-action@v1
@@ -57,6 +63,10 @@ jobs:
             - Do NOT scan the whole codebase
             - Focus on added/modified lines only (lines with + in diff)
             - This keeps analysis token-efficient
+
+            SCOPE: only run these checks if the diff touches apps/web/src, apps/backend/src, or
+            packages/schemas/src TypeScript/TSX/JS/JSX files. If it doesn't, skip straight to
+            posting "✅ Pattern check skipped — no matching files in this diff." and stop.
 
             VIOLATION COMMENT FORMAT:
             Use this exact format for each violation:

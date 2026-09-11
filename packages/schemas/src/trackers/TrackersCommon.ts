@@ -68,6 +68,11 @@ export type TrackerManifest = z.infer<typeof ZTrackerManifest>;
 // nullable because a tracker created through the API has no reason to be forced to pick one. Stored
 // as text rather than an index into a list so the list can be reordered or grown without rewriting
 // rows that already point into it.
+// DEV_NOTE: reminderHour is a column, not a manifest key — the notification dispatcher's whole job
+// is "find every tracker whose reminder hour is H" (NotificationsDAL.getTrackersDueForReminder), and
+// unindexed inside manifest_json that would be a full table scan every hour. It's in the owner's
+// timezone (users.tz), which decides WHEN to fire — never which day a row is written under (see
+// DateTime.ts). Which days a reminder can fire on is still `manifest.schedule`, already correct.
 export const ZTrackerBase = z.object({
   name: z.string(),
   icon: z.string().nullable().optional(),
@@ -76,6 +81,7 @@ export const ZTrackerBase = z.object({
   sortOrder: z.number().optional(),
   activeFrom: z.string(), // YYYY-MM-DD; heatmaps render nothing before this
   activeTo: z.string().nullable().optional(),
+  reminderHour: z.number().int().min(0).max(23).nullable().optional(),
 });
 export type TrackerBase = z.infer<typeof ZTrackerBase>;
 
@@ -293,4 +299,20 @@ export interface TrackerTimelineEntryApiShape {
   trackerPublicId: string;
   occurredAt: Date;
   endedAt: Date | null;
+}
+
+// DEV_NOTE: design/today-web.png's stat strip. Computed by TrackersRepo.getTrackers off the same
+// sums/targets it already loads for streaks (invariant: no second range scan for this) — a sibling
+// of `today`, not a new endpoint. Every figure but loggedCount/totalCount is null rather than 0 when
+// there's nothing to report (invariant 7): a user with no currency_minor tracker has no "spent
+// today" to be zero, and 0 there would read as "you spent nothing" instead of "nothing applies".
+export interface TrackerTodayStatsApiShape {
+  loggedCount: number;
+  totalCount: number;
+  timeTodaySeconds: number | null;
+  spentTodayMinor: number | null;
+  // met/scheduled tracker-days over the trailing 7 days (today included), across every tracker —
+  // the same not_active/not_scheduled/no_data/partial/met vocabulary Scoring.dayState uses per
+  // tracker, summed rather than kept apart. Null when no tracker had a scheduled day in the window.
+  sevenDayRatePercent: number | null;
 }

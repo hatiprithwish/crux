@@ -424,7 +424,7 @@ pattern_here
 
 ## 5. WORKFLOW INTEGRATION
 
-The Pattern Enforcer workflow (`pattern-enforcer.yml`) automatically:
+The Pattern Enforcer step in `.github/workflows/claude-code-review.yml` automatically:
 
 1. Reads this file on every PR
 2. Checks only the PR diff (token-efficient, not entire codebase)

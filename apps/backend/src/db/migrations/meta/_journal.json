@@ -50,6 +50,27 @@
       "when": 1788925470753,
       "tag": "0006_crux",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789063342432,
+      "tag": "0007_crux",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1789089392949,
+      "tag": "0008_crux",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1789091782650,
+      "tag": "0009_crux",
+      "breakpoints": true
     }
   ]
 }

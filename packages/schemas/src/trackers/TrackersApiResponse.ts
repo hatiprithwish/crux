@@ -5,6 +5,7 @@ import type {
   TrackerHeatmapDay,
   TrackerTimelineEntryApiShape,
   TrackerTodayApiShape,
+  TrackerTodayStatsApiShape,
 } from "./TrackersCommon";
 import type { MoneyTransferComputeResult } from "./ComputeCommon";
 import type { TrackerTargetApiShape } from "./TrackerTargetsCommon";
@@ -24,11 +25,20 @@ export interface UpdateTrackerApiResponse extends ApiResponse {
   tracker?: TrackerApiShape;
 }
 
-// DEV_NOTE: `today` is populated only when the caller asked for it (?withToday=true); `trackers` is
-// always present on success, so a list view never has to unwrap the heavier shape.
+// DEV_NOTE: `today` and `todayStats` are populated only when the caller asked for it
+// (?withToday=true); `trackers` is always present on success, so a list view never has to unwrap
+// the heavier shape.
 export interface GetTrackersApiResponse extends ApiResponse {
   trackers?: TrackerApiShape[];
   today?: TrackerTodayApiShape[];
+  todayStats?: TrackerTodayStatsApiShape;
+}
+
+// DEV_NOTE: returns the whole list, re-sorted — same reasoning as WriteTrackerTargetApiResponse:
+// a write that re-cuts every row's order would leave the client holding a list it now has to
+// refetch to trust otherwise.
+export interface ReorderTrackersApiResponse extends ApiResponse {
+  trackers?: TrackerApiShape[];
 }
 
 // DEV_NOTE: entry is absent when the quick-add cleared the day (toggle completed:false) or started

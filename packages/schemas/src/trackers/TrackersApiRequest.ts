@@ -119,3 +119,12 @@ export const ZTrackerTimelineApiQuery = z.object({
     .optional(),
 });
 export type TrackerTimelineApiQuery = z.infer<typeof ZTrackerTimelineApiQuery>;
+
+// DEV_NOTE: the whole list, in the order the caller wants it kept — not a per-tracker "move to
+// index N" — so one write settles every row's sortOrder at once and two concurrent drags can't
+// interleave into a half-applied order. Every publicId the user currently owns must be present;
+// the Repo rejects a partial list rather than guessing where the missing ones belong.
+export const ZReorderTrackersApiRequest = z.object({
+  trackerPublicIds: z.array(z.string()).min(1),
+});
+export type ReorderTrackersApiRequest = z.infer<typeof ZReorderTrackersApiRequest>;

@@ -42,7 +42,9 @@ const PRIMARY_NAV: NavItem[] = [
   { to: "/entities", label: "Things", isActive: (path) => path.startsWith("/entities") },
 ];
 
-function useDayNumber(): number | null {
+// DEV_NOTE: exported so the Today screen's stat strip (-TodayStatStrip.tsx) can render the same
+// "Day N" figure as "Tracking days" without a second implementation of this calc to drift from it.
+export function useDayNumber(): number | null {
   const { getToken } = useAuth();
   const { data } = useQuery(UsersQueries.me(getToken));
   // DEV_NOTE: lazy init, not `new Date()` inline — render must stay pure. "Today" only changes once
@@ -110,13 +112,22 @@ export function AppSidebar() {
       </nav>
 
       <div className="flex shrink-0 flex-col gap-2 border-t border-sidebar-border px-5 py-4">
-        <Link
-          to="/archived"
-          className="text-xs text-muted-foreground hover:text-foreground"
-          activeProps={{ className: "text-foreground" }}
-        >
-          Archived
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/archived"
+            className="text-xs text-muted-foreground hover:text-foreground"
+            activeProps={{ className: "text-foreground" }}
+          >
+            Archived
+          </Link>
+          <Link
+            to="/settings"
+            className="text-xs text-muted-foreground hover:text-foreground"
+            activeProps={{ className: "text-foreground" }}
+          >
+            Settings
+          </Link>
+        </div>
         <div className="flex items-center gap-2">
           <UserButton />
         </div>

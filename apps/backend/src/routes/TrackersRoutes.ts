@@ -53,6 +53,23 @@ TrackersRoutes.post("/unarchive-all", checkAuth, async (c) => {
   return c.json(response, response.isSuccess ? 200 : 500);
 });
 
+// DEV_NOTE: registered before /:publicId below for the same reason as unarchive-all — "reorder"
+// must never be parsed as a tracker publicId.
+TrackersRoutes.post(
+  "/reorder",
+  checkAuth,
+  zValidator("json", Schemas.ZReorderTrackersApiRequest),
+  async (c) => {
+    const userId = c.get("clerkUserId");
+    const { trackerPublicIds } = c.req.valid("json");
+
+    const repo = new TrackersRepo(c.env);
+    const response = await repo.reorderTrackers({ userId, trackerPublicIds });
+
+    return c.json(response, response.isSuccess ? 200 : 400);
+  },
+);
+
 // DEV_NOTE: registered before /:publicId below for the same reason as unarchive-all — "today" must
 // never be parsed as a tracker publicId.
 TrackersRoutes.get(

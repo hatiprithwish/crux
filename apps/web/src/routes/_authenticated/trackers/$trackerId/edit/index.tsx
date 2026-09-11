@@ -70,6 +70,7 @@ function EditTrackerPage() {
                   name: value.tracker.name,
                   icon: value.tracker.icon,
                   activeFrom: value.tracker.activeFrom,
+                  reminderHour: value.tracker.reminderHour,
                   manifest: {
                     target: value.tracker.manifest.target,
                     step: value.tracker.manifest.step,

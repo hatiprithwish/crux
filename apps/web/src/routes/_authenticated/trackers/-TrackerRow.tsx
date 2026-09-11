@@ -1,15 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { DotsThree, Archive, PencilSimple } from "@phosphor-icons/react";
-import { Button } from "@/shadcn/ui/button";
 import { cn } from "@/utils/tailwind";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/shadcn/ui/dropdown-menu";
 import type * as Schemas from "@app/schemas";
-import { useArchiveTracker, useQuickAdd } from "./-data";
+import { useQuickAdd } from "./-data";
 import { ToggleControl } from "./-ToggleControl";
 import { IncrementControl } from "./-IncrementControl";
 import { StepperControl } from "./-StepperControl";
@@ -45,7 +37,6 @@ interface TrackerRowProps {
 export default function TrackerRow({ today }: TrackerRowProps) {
   const tracker = today.tracker;
   const quickAdd = useQuickAdd();
-  const archiveTracker = useArchiveTracker();
 
   const controlProps: ControlProps = {
     tracker,
@@ -63,62 +54,38 @@ export default function TrackerRow({ today }: TrackerRowProps) {
     <div
       className={cn(
         // px-6 matches every other section on the screen — the row is the page's content now, not
-        // a card inside a centred column.
-        "flex flex-col gap-3 border-b border-border px-6 py-4",
+        // a card inside a centred column. Name and control share one line (design/today-web.png) —
+        // editing/archiving a tracker is the management list's job (/trackers/all), not this row's.
+        "flex items-center justify-between gap-4 border-b border-border px-6 py-4",
         isRunning && "border-l-2 border-l-primary bg-primary/5 pl-5.5",
       )}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          {/* DEV_NOTE: the slot is rendered whether or not the tracker has an icon, so every name
-              in the list starts at the same x — a list where only some rows are indented is harder
-              to scan than one with no icons at all. */}
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-sm border border-border text-base">
-            {tracker.icon}
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-base font-medium">
-              {/* DEV_NOTE: underlined on hover because it is a link to the history screen — the
-                  only path there now that the row no longer duplicates it as a button. */}
-              <Link
-                to="/trackers/$trackerId"
-                params={{ trackerId: tracker.publicId }}
-                className="hover:underline"
-              >
-                {tracker.name}
-              </Link>
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {describeSchedule(tracker.manifest.schedule)}
-              {today.streak > 0 ? ` · ${today.streak} day streak` : ""}
-            </span>
-          </div>
+      <div className="flex items-center gap-3">
+        {/* DEV_NOTE: the slot is rendered whether or not the tracker has an icon, so every name
+            in the list starts at the same x — a list where only some rows are indented is harder
+            to scan than one with no icons at all. */}
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-sm border border-border text-base">
+          {tracker.icon}
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm" aria-label="Tracker options">
-              <DotsThree className="size-4" weight="bold" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <Link to="/trackers/$trackerId/edit" params={{ trackerId: tracker.publicId }}>
-                <PencilSimple className="size-4" />
-                Edit
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              variant="destructive"
-              disabled={archiveTracker.isPending}
-              onSelect={() => archiveTracker.mutate(tracker.publicId)}
+        <div className="flex flex-col gap-1">
+          <span className="text-base font-medium">
+            {/* DEV_NOTE: underlined on hover because it is a link to the history screen — the
+                only path there now that the row no longer duplicates it as a button. */}
+            <Link
+              to="/trackers/$trackerId"
+              params={{ trackerId: tracker.publicId }}
+              className="hover:underline"
             >
-              <Archive className="size-4" />
-              Archive
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {tracker.name}
+            </Link>
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {describeSchedule(tracker.manifest.schedule)}
+            {today.streak > 0 ? ` · ${today.streak} day streak` : ""}
+          </span>
+        </div>
       </div>
-      {renderControl(tracker.manifest.control, controlProps)}
+      <div className="shrink-0">{renderControl(tracker.manifest.control, controlProps)}</div>
     </div>
   );
 }

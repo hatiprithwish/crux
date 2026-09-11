@@ -8,3 +8,7 @@ export interface SyncClerkUserApiResponse extends ApiResponse {
 export interface GetUserDetailsApiResponse extends ApiResponse {
   user?: User;
 }
+
+export interface UpdateUserApiResponse extends ApiResponse {
+  user?: User;
+}

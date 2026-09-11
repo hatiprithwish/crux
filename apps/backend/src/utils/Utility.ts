@@ -26,6 +26,29 @@ export default class Utility {
     return chunks;
   }
 
+  // DEV_NOTE: a package with a native equivalent is banned (CLAUDE.md), and this is ~20 lines — no
+  // p-limit. Bounds how many sends the notification dispatcher has in flight at once; CPU cost per
+  // send is sub-millisecond (one ECDH derive, three HKDFs, one AES-GCM), so this exists purely to cap
+  // concurrent subrequests, not to spread out CPU work.
+  static async mapWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    fn: (item: T) => Promise<R>,
+  ): Promise<R[]> {
+    const results: R[] = new Array(items.length);
+    let nextIndex = 0;
+
+    async function worker() {
+      while (nextIndex < items.length) {
+        const current = nextIndex++;
+        results[current] = await fn(items[current]);
+      }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+    return results;
+  }
+
   static skipNulls<T extends object>(
     obj: T,
   ): { [K in keyof T]: T[K] extends null ? undefined : T[K] } {

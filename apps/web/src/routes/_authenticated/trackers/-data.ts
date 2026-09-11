@@ -352,6 +352,64 @@ export function useUnarchiveAllTrackers() {
   });
 }
 
+// DEV_NOTE: design/today-web.png's "YOUR ORDER" drag handle. Optimistic — a drag that visibly
+// snapped back after every drop would make the list feel broken — so the dragged-to position is
+// written to the withToday=true cache immediately and only rolled back if the request fails.
+// list(false) (the /trackers/all screen) is left to invalidateQueries on settle rather than patched
+// the same way, since it isn't open during a drag on this screen.
+export function useReorderTrackers() {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (trackerPublicIds: string[]) =>
+      apiClient<Schemas.ReorderTrackersApiResponse>("/trackers/reorder", getToken, {
+        method: "POST",
+        body: JSON.stringify({ trackerPublicIds }),
+      }),
+    onMutate: async (trackerPublicIds) => {
+      await queryClient.cancelQueries({ queryKey: TrackersQueries.keys.list(true) });
+      const previous = queryClient.getQueryData<Schemas.GetTrackersApiResponse>(
+        TrackersQueries.keys.list(true),
+      );
+
+      if (previous?.trackers) {
+        const trackerByPublicId = new Map(
+          previous.trackers.map((tracker) => [tracker.publicId, tracker]),
+        );
+        const todayByPublicId = new Map(
+          (previous.today ?? []).map((row) => [row.tracker.publicId, row]),
+        );
+
+        queryClient.setQueryData<Schemas.GetTrackersApiResponse>(TrackersQueries.keys.list(true), {
+          ...previous,
+          trackers: trackerPublicIds.flatMap((publicId) => {
+            const tracker = trackerByPublicId.get(publicId);
+            return tracker ? [tracker] : [];
+          }),
+          today: previous.today
+            ? trackerPublicIds.flatMap((publicId) => {
+                const row = todayByPublicId.get(publicId);
+                return row ? [row] : [];
+              })
+            : previous.today,
+        });
+      }
+
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(TrackersQueries.keys.list(true), context.previous);
+      }
+      toast.error("Failed to reorder trackers. Please try again.");
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: TrackersQueries.keys.all() });
+    },
+  });
+}
+
 // DEV_NOTE: MetricsQueries used to live here. It moved to metrics/-data.ts when metrics got a screen
 // of their own — a metric is a user-global resource (architecture.md §5), not a detail of the
 // tracker that happened to declare it.

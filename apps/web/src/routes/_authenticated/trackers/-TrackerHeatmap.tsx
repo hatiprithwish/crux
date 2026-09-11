@@ -114,7 +114,7 @@ export default function TrackerHeatmap({
             labels beside it are a separate grid: anything that makes a cell's height depend on the
             viewport puts the two grids out of step. min-w is what makes the overflow-x scroll kick
             in on a phone instead of squeezing 52 weeks into 320px. */}
-        <div className="grid min-w-xl flex-1 auto-cols-fr grid-flow-col grid-rows-7 gap-1">
+        <div className="grid flex-1 auto-cols-fr grid-flow-col grid-rows-7 gap-1 sm:min-w-xl">
           {Array.from({ length: leadingBlanks }, (_, index) =>
             addDaysToLocalDate(days[0].localDate, index - leadingBlanks),
           ).map((paddingDate) => (

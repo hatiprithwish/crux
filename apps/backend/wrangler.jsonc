@@ -74,8 +74,12 @@
       // DEV_NOTE: weekday is spelled "SUN", not 0. Cloudflare's weekday field is 1-7 with
       // 1 = Sunday (NOT the usual 0-6), so "0 0 * * 0" is out of range and the API rejects the
       // deploy with "invalid cron string [code: 10100]". The abbreviation avoids the off-by-one.
+      // DEV_NOTE: "0 * * * *" is the hourly notification dispatch (Constants.CRON_NOTIFICATION_
+      // DISPATCH) — production only, same reasoning as the orphan scan: staging has no real
+      // subscriptions or reminder hours for an hourly send loop to be meaningful, and it would
+      // just burn subrequests against test data every hour.
       "triggers": {
-        "crons": ["0 0 * * SUN"],
+        "crons": ["0 0 * * SUN", "0 * * * *"],
       },
     },
   },

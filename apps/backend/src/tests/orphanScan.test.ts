@@ -6,6 +6,7 @@ import getDbClient from "@/db/dbClient";
 import { entryValues } from "@/db/tables";
 import MetricsDAL from "@/data-access-layer/MetricsDAL";
 import OrphanScanRepo from "@/repositories/OrphanScanRepo";
+import Constants from "@/config/Constants";
 
 declare module "cloudflare:test" {
   interface ProvidedEnv extends Env {}
@@ -107,7 +108,7 @@ describe("Weekly orphan scan (architecture.md §4.1)", () => {
       mockError.mockClear();
       const ctx = createExecutionContext();
       await worker.scheduled(
-        { scheduledTime: Date.now(), cron: "0 0 * * 0", noRetry: () => {} },
+        { scheduledTime: Date.now(), cron: Constants.CRON_ORPHAN_SCAN, noRetry: () => {} },
         testEnv,
         ctx,
       );

@@ -15,6 +15,10 @@ export interface UserBase {
 
 export interface User extends UserBase {
   publicId: string;
+  // DEV_NOTE: decides WHEN a reminder fires, never WHICH day's data a read/write lands on — see
+  // DateTime.ts and architecture.md §4 invariant 4. IANA zone name, e.g. "Asia/Kolkata".
+  tz: string;
+  homeCurrency: string;
   createdAt: Date;
   updatedAt?: Date | null;
 }

@@ -81,6 +81,9 @@ const ZTrackerFormValues = z
     // the two can differ.
     targetEffectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     activeFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    // DEV_NOTE: null = "no reminder", the default for every tracker until its owner opts in — not a
+    // manifest field (see ZTrackerBase's DEV_NOTE), so it travels as its own sibling here too.
+    reminderHour: z.number().int().min(0).max(23).nullable(),
     metricMode: z.enum(["derived", "custom", "existing"]),
     metricPublicId: z.string(),
     metricKey: z.string(),
@@ -125,6 +128,17 @@ const SCHEDULE_OPTIONS: { value: TrackerFormValues["scheduleType"]; label: strin
   { value: "days_of_week", label: "Some days" },
   { value: "times_per_week", label: "N per week" },
 ];
+
+const REMINDER_HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => hour);
+
+// DEV_NOTE: the hour is stored and dispatched in the tracker owner's timezone (users.tz) — this
+// only formats it for display, using the browser's own locale rather than a hardcoded AM/PM string.
+function formatHourLabel(hour: number): string {
+  return new Date(2000, 0, 1, hour).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 // DEV_NOTE: a metric derived from an unnamed tracker still needs an addressable key — metrics are
 // unique per (user_id, key) and "" is unaddressable from a manifest (MetricsCommon.ts). The form
@@ -245,6 +259,7 @@ function valuesFromTracker(tracker: Schemas.TrackerApiShape): TrackerFormValues 
     // existed, in the window before migration 0004 has run against the row.
     direction: manifest.direction ?? primary?.defaultDirection ?? "higher_better",
     activeFrom: tracker.activeFrom,
+    reminderHour: tracker.reminderHour ?? null,
     metricMode: "existing",
     metricPublicId: tracker.primaryMetricPublicId,
     metricKey: tracker.primaryMetricKey,
@@ -311,6 +326,7 @@ export function TrackerForm({
         direction: deriveDirection("toggle"),
         targetEffectiveFrom: getTodayLocalDate(),
         activeFrom: getTodayLocalDate(),
+        reminderHour: null,
         metricMode: "derived",
         metricPublicId: "",
         metricKey: "",
@@ -361,6 +377,7 @@ export function TrackerForm({
               displayUnit,
             },
             activeFrom: value.activeFrom,
+            reminderHour: value.reminderHour,
           },
           metric: metricSpec,
         },
@@ -658,6 +675,42 @@ export function TrackerForm({
                 <span className="text-xs text-muted-foreground">
                   {formatStartDate(field.state.value)}
                 </span>
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div className="border-b border-border px-6 py-5">
+          <form.Field name="reminderHour">
+            {(field) => (
+              <div className="flex flex-col gap-2 sm:max-w-60">
+                <div className="flex items-center gap-1.5">
+                  <FieldLabelText htmlFor={field.name}>Reminder</FieldLabelText>
+                  <InfoHint label="Why a per-tracker reminder">
+                    A push notification at this hour, in your timezone, on days this tracker asks
+                    you to log — only if you haven't yet.
+                  </InfoHint>
+                </div>
+                <Select
+                  value={field.state.value === null ? "none" : String(field.state.value)}
+                  onValueChange={(value) =>
+                    field.handleChange(value === "none" ? null : Number(value))
+                  }
+                >
+                  <SelectTrigger id={field.name} className={UNDERLINE_TRIGGER}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="none">No reminder</SelectItem>
+                      {REMINDER_HOUR_OPTIONS.map((hour) => (
+                        <SelectItem key={hour} value={String(hour)}>
+                          {formatHourLabel(hour)}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               </div>
             )}
           </form.Field>

@@ -5,7 +5,9 @@ import TrackersDAL from "@/data-access-layer/TrackersDAL";
 import { factValue } from "@/manifest/Aggregation";
 import { planQuickAdd, type PlannedEntry } from "@/manifest/ControlHandlers";
 import { getComputeModule, validateComputeManifest } from "@/manifest/ComputeRegistry";
+import { addDays, computeStreak, dayState, resolveTargetAt } from "@/manifest/Scoring";
 import Utility from "@/utils/Utility";
+import { utcDateString } from "@/utils/DateTime";
 import type * as Schemas from "@app/schemas";
 
 // DEV_NOTE: architecture.md §7 step 4 — the manifest engine. One Repo for every tracker there will
@@ -14,9 +16,11 @@ import type * as Schemas from "@app/schemas";
 // any, handles what a control can't (ComputeRegistry). Composes the same shared DALs those Repos
 // did — there is no TrackersDAL-level change in this phase.
 //
-// DEV_NOTE: no per-user timezone preference exists anywhere in the app yet (mirrors the frontend's
-// -utils.ts) — dates are UTC-based end to end. entries.tz is stored per invariant 4 so this can be
-// swapped for a real per-user tz later without a data migration; today it's always "UTC".
+// DEV_NOTE: `users.tz` now exists (see DateTime.ts) but decides WHEN to send a reminder, never
+// WHICH day a row is written under — entries.local_date/daily_facts.local_date stay keyed by the
+// UTC day, so this stays "UTC" even for a user with a real tz set. entries.tz is stored per
+// invariant 4 so a genuine per-entry local day can replace this later without a data migration;
+// today it's always "UTC". See architecture.md §4 invariant 4.
 const APP_TZ = "UTC";
 
 // DEV_NOTE: how far back the Today screen's single daily_facts scan reaches. Long enough for any
@@ -46,45 +50,7 @@ export default class TrackersRepo {
   // --- date helpers ----------------------------------------------------------------------------
 
   private todayLocalDate(): string {
-    return new Date().toISOString().slice(0, 10);
-  }
-
-  private addDays(localDate: string, delta: number): string {
-    const date = new Date(`${localDate}T00:00:00.000Z`);
-    date.setUTCDate(date.getUTCDate() + delta);
-    return date.toISOString().slice(0, 10);
-  }
-
-  private dayOfWeek(localDate: string): number {
-    return new Date(`${localDate}T00:00:00.000Z`).getUTCDay();
-  }
-
-  // DEV_NOTE: a "times_per_week" schedule names a count, not days — so every day is an opportunity
-  // and none is a miss. Returning true here is what keeps invariant 7 honest for that shape: an
-  // unlogged day renders as no-data, never as a failure.
-  private isScheduled(localDate: string, schedule: Schemas.TrackerSchedule): boolean {
-    if (schedule.type === "days_of_week") return schedule.days.includes(this.dayOfWeek(localDate));
-    return true;
-  }
-
-  // --- target history --------------------------------------------------------------------------
-
-  // DEV_NOTE: the fix for "raising a target rescored every day I'd already lived". Scoring used to
-  // read `tracker.manifest.target` — the live value — for every day in the range, so a goal set
-  // today reached backwards and demoted a month of met days to partial. A target is a value *from
-  // a date*: this resolves which one was in force on the day being scored.
-  //
-  // DEV_NOTE: a day earlier than every row resolves to null, not to the oldest row, and null means
-  // "no target then" — which dayState already scores as met for any logged day. That is what makes
-  // the era before a user first set a goal read the way they actually lived it.
-  //
-  // Rows arrive ascending (TrackersDAL orders them), so the last one that has started is the one in
-  // force. Walked backwards because the recent end is where every read lands.
-  private resolveTargetAt(targets: Schemas.TrackerTarget[], localDate: string): number | null {
-    for (let index = targets.length - 1; index >= 0; index--) {
-      if (targets[index].effectiveFrom <= localDate) return targets[index].target;
-    }
-    return null;
+    return utcDateString(new Date());
   }
 
   private toTargetApiShape(target: Schemas.TrackerTarget): Schemas.TrackerTargetApiShape {
@@ -269,6 +235,7 @@ export default class TrackersRepo {
       sortOrder: params.tracker.sortOrder,
       activeFrom: params.tracker.activeFrom,
       activeTo: params.tracker.activeTo,
+      reminderHour: params.tracker.reminderHour,
     });
     if (!created.isSuccess || !created.tracker) {
       return { isSuccess: false, message: created.message };
@@ -386,7 +353,7 @@ export default class TrackersRepo {
       }
       manifestToWrite = {
         ...manifest,
-        target: this.resolveTargetAt(history.targets ?? [], this.todayLocalDate()),
+        target: resolveTargetAt(history.targets ?? [], this.todayLocalDate()),
       };
     }
 
@@ -526,7 +493,7 @@ export default class TrackersRepo {
     });
     if (!result.isSuccess) return { isSuccess: false, message: result.message };
 
-    const current = this.resolveTargetAt(result.targets ?? [], this.todayLocalDate());
+    const current = resolveTargetAt(result.targets ?? [], this.todayLocalDate());
     if (current === tracker.manifest.target) return { isSuccess: true };
 
     const updated = await this.trackersDal.updateTracker({
@@ -563,7 +530,7 @@ export default class TrackersRepo {
     }
 
     const today = this.todayLocalDate();
-    const windowStart = this.addDays(today, -(STREAK_WINDOW_DAYS - 1));
+    const windowStart = addDays(today, -(STREAK_WINDOW_DAYS - 1));
 
     // DEV_NOTE: one range scan for every tracker's primary metric — the Today screen renders N
     // widgets off a single query rather than N round trips against a remote D1 binding. The target
@@ -613,9 +580,17 @@ export default class TrackersRepo {
     }
 
     const todayShapes: Schemas.TrackerTodayApiShape[] = [];
+    let loggedCount = 0;
+    let timeTodaySeconds: number | null = null;
+    let spentTodayMinor: number | null = null;
+    let sevenDayMet = 0;
+    let sevenDayScheduled = 0;
+    const sevenDayWindow = [0, 1, 2, 3, 4, 5, 6].map((delta) => addDays(today, -delta));
+
     for (const [index, tracker] of trackers.entries()) {
       const sums = valuesByMetric.get(tracker.primaryMetricId) ?? new Map<string, number>();
       const todaySum = sums.has(today) ? (sums.get(today) as number) : null;
+      const targets = targetsByTracker.get(tracker.id) ?? [];
 
       let openSession: Schemas.TrackerEntryApiShape | null = null;
       if (tracker.manifest.control === "timer") {
@@ -626,16 +601,45 @@ export default class TrackersRepo {
         tracker: shapes[index],
         todaySum,
         todayCount: todaySum === null ? 0 : 1,
-        streak: this.computeStreak(sums, tracker, targetsByTracker.get(tracker.id) ?? [], today),
+        streak: computeStreak(sums, tracker, targets, today),
         openSession,
       });
+
+      // DEV_NOTE: design/today-web.png's stat strip — computed off the sums/targets already loaded
+      // above for streaks, not a second range scan.
+      if (todaySum !== null || openSession !== null) loggedCount++;
+
+      const semanticType = shapes[index].metricDetails[0]?.semanticType;
+      if (todaySum !== null && semanticType === "duration_seconds") {
+        timeTodaySeconds = (timeTodaySeconds ?? 0) + todaySum;
+      }
+      if (todaySum !== null && semanticType === "currency_minor") {
+        spentTodayMinor = (spentTodayMinor ?? 0) + todaySum;
+      }
+
+      for (const date of sevenDayWindow) {
+        const state = dayState(date, sums, tracker, resolveTargetAt(targets, date));
+        if (state === "not_active" || state === "not_scheduled") continue;
+        sevenDayScheduled++;
+        if (state === "met") sevenDayMet++;
+      }
     }
+
+    const todayStats: Schemas.TrackerTodayStatsApiShape = {
+      loggedCount,
+      totalCount: trackers.length,
+      timeTodaySeconds,
+      spentTodayMinor,
+      sevenDayRatePercent:
+        sevenDayScheduled === 0 ? null : Math.round((sevenDayMet / sevenDayScheduled) * 100),
+    };
 
     return {
       isSuccess: true,
       message: "Trackers fetched successfully",
       trackers: shapes,
       today: todayShapes,
+      todayStats,
     };
   }
 
@@ -727,6 +731,52 @@ export default class TrackersRepo {
       message: result.message,
       restoredCount: result.restoredCount,
     };
+  }
+
+  // DEV_NOTE: the whole active list, not one tracker at a time — see ZReorderTrackersApiRequest.
+  // Rejects a request that doesn't name every active tracker exactly once rather than guessing
+  // where an omitted one belongs (it would otherwise keep whatever sortOrder it had, silently
+  // interleaving with the trackers that were just placed around it).
+  async reorderTrackers(params: {
+    userId: string;
+    trackerPublicIds: string[];
+  }): Promise<Schemas.ReorderTrackersApiResponse> {
+    const [trackersResult, metrics] = await Promise.all([
+      this.trackersDal.getTrackers({ userId: params.userId }),
+      this.loadMetrics(params.userId),
+    ]);
+    if (!trackersResult.isSuccess || !trackersResult.trackers) {
+      return { isSuccess: false, message: trackersResult.message };
+    }
+    if (!metrics) return { isSuccess: false, message: "Failed to load metrics" };
+
+    const byPublicId = new Map(
+      trackersResult.trackers.map((tracker) => [tracker.publicId, tracker]),
+    );
+    const isCompleteReorder =
+      params.trackerPublicIds.length === byPublicId.size &&
+      new Set(params.trackerPublicIds).size === byPublicId.size &&
+      params.trackerPublicIds.every((publicId) => byPublicId.has(publicId));
+    if (!isCompleteReorder) {
+      return {
+        isSuccess: false,
+        message: "Reorder must include every active tracker exactly once",
+      };
+    }
+
+    const order = params.trackerPublicIds.map((publicId, index) => ({
+      id: (byPublicId.get(publicId) as Schemas.Tracker).id,
+      sortOrder: index,
+    }));
+
+    const result = await this.trackersDal.reorderTrackers({ userId: params.userId, order });
+    if (!result.isSuccess) return { isSuccess: false, message: result.message };
+
+    const reordered = params.trackerPublicIds.map((publicId) =>
+      this.toTrackerApiShape(byPublicId.get(publicId) as Schemas.Tracker, metrics),
+    );
+
+    return { isSuccess: true, message: "Trackers reordered successfully", trackers: reordered };
   }
 
   async getEntries(params: {
@@ -859,13 +909,13 @@ export default class TrackersRepo {
     const targets = targetsResult.targets ?? [];
 
     const days: Schemas.TrackerHeatmapDay[] = [];
-    for (let date = params.dateFrom; date <= params.dateTo; date = this.addDays(date, 1)) {
+    for (let date = params.dateFrom; date <= params.dateTo; date = addDays(date, 1)) {
       // DEV_NOTE: the day's own target travels with the day, which is what lets the client draw a
       // target line that steps when the goal changed rather than one flat line at today's value.
-      const target = this.resolveTargetAt(targets, date);
+      const target = resolveTargetAt(targets, date);
       days.push({
         localDate: date,
-        state: this.dayState(date, sums, tracker, target),
+        state: dayState(date, sums, tracker, target),
         sum: sums.has(date) ? (sums.get(date) as number) : null,
         target,
       });
@@ -875,67 +925,8 @@ export default class TrackersRepo {
       isSuccess: true,
       message: "Heatmap fetched successfully",
       days,
-      streak: this.computeStreak(sums, tracker, targets, this.todayLocalDate()),
+      streak: computeStreak(sums, tracker, targets, this.todayLocalDate()),
     };
-  }
-
-  // DEV_NOTE: `target` is passed in rather than read off the manifest — it is the target that was in
-  // force on `localDate` (resolveTargetAt), not the one configured today. That parameter is the
-  // whole bug fix: everything else here is unchanged.
-  private dayState(
-    localDate: string,
-    sums: Map<string, number>,
-    tracker: Schemas.Tracker,
-    target: number | null,
-  ): Schemas.TrackerDayState {
-    if (localDate < tracker.activeFrom) return "not_active";
-    if (!this.isScheduled(localDate, tracker.manifest.schedule)) return "not_scheduled";
-    if (!sums.has(localDate)) return "no_data";
-
-    // DEV_NOTE: architecture.md §6 — "compare using `direction` and the target in force". A
-    // neutral tracker states there is no better side to be on, so a logged day is met and nothing
-    // is scored against the target, exactly as a tracker with no target at all.
-    // The ?? is for manifests written before direction moved onto them (migration 0004 backfills
-    // the stored rows; this keeps an unmigrated read honest rather than crashing).
-    //
-    // DEV_NOTE: direction is read live, unlike the target. Raising a goal opens a new chapter, so
-    // the old one keeps its old bar; flipping direction says the number always meant the opposite
-    // of what was stored, and the honest response to a correction is to rescore what it got wrong.
-    const direction = tracker.manifest.direction ?? "higher_better";
-    if (target === null || direction === "neutral") return "met";
-
-    const sum = sums.get(localDate) as number;
-    const met = direction === "lower_better" ? sum <= target : sum >= target;
-    return met ? "met" : "partial";
-  }
-
-  // DEV_NOTE: invariant 8 — streaks count through yesterday; today only extends the streak if
-  // already met (an unmet today doesn't break it, since the day isn't over). Unscheduled days are
-  // skipped rather than counted or broken on (architecture.md §6 "skip unscheduled days").
-  private computeStreak(
-    sums: Map<string, number>,
-    tracker: Schemas.Tracker,
-    targets: Schemas.TrackerTarget[],
-    today: string,
-  ): number {
-    const stateOn = (date: string) =>
-      this.dayState(date, sums, tracker, this.resolveTargetAt(targets, date));
-
-    let streak = stateOn(today) === "met" ? 1 : 0;
-    let cursor = this.addDays(today, -1);
-
-    while (cursor >= tracker.activeFrom) {
-      const state = stateOn(cursor);
-      if (state === "not_scheduled") {
-        cursor = this.addDays(cursor, -1);
-        continue;
-      }
-      if (state !== "met") break;
-      streak++;
-      cursor = this.addDays(cursor, -1);
-    }
-
-    return streak;
   }
 
   async getBreakdown(params: {

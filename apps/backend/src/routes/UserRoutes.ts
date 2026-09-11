@@ -5,6 +5,7 @@ import ClerkProvider from "@/providers/clerk";
 import type AppContext from "@/config/AppContext";
 import * as Schemas from "@app/schemas";
 import AppLogger from "@/providers/logger";
+import { zValidator } from "@hono/zod-validator";
 
 const UsersRoutes = new Hono<AppContext>();
 
@@ -47,5 +48,20 @@ UsersRoutes.get("/me", checkAuth, async (c) => {
 
   return c.json(response, response.isSuccess ? 200 : 404);
 });
+
+UsersRoutes.patch(
+  "/me",
+  checkAuth,
+  zValidator("json", Schemas.ZUpdateUserApiRequest),
+  async (c) => {
+    const clerkId = c.get("clerkUserId");
+    const body = c.req.valid("json");
+
+    const repo = new UsersRepo(c.env);
+    const response = await repo.updateUser({ ...body, clerkId });
+
+    return c.json(response, response.isSuccess ? 200 : 404);
+  },
+);
 
 export default UsersRoutes;

@@ -145,7 +145,7 @@ function TrackerDetailPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-6 py-8">
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-6 py-5 sm:py-8">
         <div className="flex min-w-0 items-start gap-3">
           {tracker.icon ? (
             <span className="flex size-9 shrink-0 items-center justify-center rounded-sm border border-border text-lg">
@@ -156,7 +156,9 @@ function TrackerDetailPage() {
             <p className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
               {eyebrow}
             </p>
-            <h1 className="font-heading truncate text-3xl font-semibold">{tracker.name}</h1>
+            <h1 className="font-heading truncate text-xl font-semibold sm:text-3xl">
+              {tracker.name}
+            </h1>
           </div>
         </div>
 

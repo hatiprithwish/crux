@@ -17,6 +17,7 @@ export enum LogAction {
 
   // User
   GetUserDetails = "GetUserDetails",
+  UpdateUserDetails = "UpdateUserDetails",
 
   // Substrate — entities
   CreateEntity = "CreateEntity",
@@ -45,6 +46,7 @@ export enum LogAction {
   ArchiveTracker = "ArchiveTracker",
   UnarchiveTracker = "UnarchiveTracker",
   DeleteTracker = "DeleteTracker",
+  ReorderTrackers = "ReorderTrackers",
 
   // Substrate — tracker target history (a target is a value *from a date*, not one number)
   CreateTrackerTarget = "CreateTrackerTarget",
@@ -73,4 +75,21 @@ export enum LogAction {
   // Infra — weekly orphan scan (architecture.md §4.1)
   RunOrphanScan = "RunOrphanScan",
   OrphanRowsDetected = "OrphanRowsDetected",
+
+  // Notifications (PR 2: push plumbing; PR 3/4: dispatch, added together so later PRs don't touch
+  // this file again)
+  CreatePushSubscription = "CreatePushSubscription",
+  GetPushSubscriptions = "GetPushSubscriptions",
+  DeletePushSubscription = "DeletePushSubscription",
+  PrunePushSubscription = "PrunePushSubscription",
+  GetNotificationPrefs = "GetNotificationPrefs",
+  UpsertNotificationPrefs = "UpsertNotificationPrefs",
+  SendWebPush = "SendWebPush",
+  SendTestNotification = "SendTestNotification",
+  GetSubscribedUserIds = "GetSubscribedUserIds",
+  GetTrackersDueForReminder = "GetTrackersDueForReminder",
+  GetOpenIntervalsForUsers = "GetOpenIntervalsForUsers",
+  ClaimNotificationSend = "ClaimNotificationSend",
+  RunNotificationDispatch = "RunNotificationDispatch",
+  UnknownCronTrigger = "UnknownCronTrigger",
 }

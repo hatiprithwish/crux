@@ -79,7 +79,7 @@
   --chart-3: oklch(0.648 0.2 131.684);
   --chart-4: oklch(0.532 0.157 131.589);
   --chart-5: oklch(0.453 0.124 130.933);
-  --radius: 0.45rem;
+  --radius: 0rem;
   --sidebar: oklch(0.987 0.002 197.1);
   --sidebar-foreground: oklch(0.148 0.004 228.8);
   --sidebar-primary: oklch(0.8 0.15 165);
@@ -138,5 +138,13 @@
   }
   html {
     @apply font-sans;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
   }
 }

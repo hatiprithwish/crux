@@ -8,7 +8,9 @@ import UsersRoutes from "@/routes/UserRoutes";
 import TrackersRoutes from "@/routes/TrackersRoutes";
 import EntitiesRoutes from "@/routes/EntitiesRoutes";
 import MetricsRoutes from "@/routes/MetricsRoutes";
+import NotificationsRoutes from "@/routes/NotificationsRoutes";
 import OrphanScanRepo from "@/repositories/OrphanScanRepo";
+import NotificationsRepo from "@/repositories/NotificationsRepo";
 import * as Schemas from "@app/schemas";
 import Constants from "@/config/Constants";
 
@@ -51,6 +53,7 @@ app.route("/users", UsersRoutes);
 app.route("/trackers", TrackersRoutes);
 app.route("/entities", EntitiesRoutes);
 app.route("/metrics", MetricsRoutes);
+app.route("/notifications", NotificationsRoutes);
 
 // DEV_NOTE: last-resort net for exceptions thrown outside a DAL's try/catch (e.g. a third-party
 // SDK call in a route handler) — without this, Hono's default 500 has no body and the Workers
@@ -70,12 +73,35 @@ export default {
     ctx.waitUntil(disposeLogger());
     return app.fetch(req, env, ctx);
   },
-  // DEV_NOTE: architecture.md §4.1 — weekly cron trigger (see wrangler.jsonc's triggers.crons) that
-  // runs the orphan scan and logs any non-zero count as a bug signal. No HTTP surface, so this
-  // bypasses the Hono app entirely and calls the Repo directly.
+  // DEV_NOTE: two cron triggers now (see wrangler.jsonc's triggers.crons and Constants.ts) —
+  // Cloudflare invokes scheduled() once per configured expression with controller.cron set to that
+  // expression string exactly as configured, so the switch dispatches on the literal string rather
+  // than inferring which job from the time. No HTTP surface for either job, so this bypasses the
+  // Hono app entirely and calls the Repo directly.
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     // DEV_NOTE: the module-level `await configureLogger()` above already ran before this handler
     // can be invoked — mirrors fetch(), which only ever disposes, never re-configures.
-    ctx.waitUntil(new OrphanScanRepo(env).runScan().then(() => disposeLogger()));
+    switch (controller.cron) {
+      case Constants.CRON_ORPHAN_SCAN:
+        ctx.waitUntil(new OrphanScanRepo(env).runScan().then(() => disposeLogger()));
+        break;
+      case Constants.CRON_NOTIFICATION_DISPATCH:
+        // DEV_NOTE: scheduledTime, not Date.now() — a delayed or retried invocation must still
+        // resolve to the hour it was scheduled for (see NotificationsRepo.runHourlyDispatch).
+        ctx.waitUntil(
+          new NotificationsRepo(env)
+            .runHourlyDispatch({ at: new Date(controller.scheduledTime) })
+            .then(() => disposeLogger()),
+        );
+        break;
+      default:
+        AppLogger.error({
+          category: Schemas.LogCategory.Route,
+          action: Schemas.LogAction.UnknownCronTrigger,
+          message: `Unknown cron trigger: ${controller.cron}`,
+          metadata: { cron: controller.cron },
+        });
+        ctx.waitUntil(disposeLogger());
+    }
   },
 };

@@ -141,6 +141,10 @@ export const trackers = table(
     sortOrder: t.integer("sort_order").notNull().default(0),
     activeFrom: t.text("active_from").notNull(), // YYYY-MM-DD; heatmaps render nothing before this
     activeTo: t.text("active_to"), // set when paused/retired
+    // DEV_NOTE: the owner's timezone (users.tz), not UTC — see ZTrackerBase's DEV_NOTE. Nullable:
+    // most trackers have no reminder. Partial-indexed below so the hourly dispatch's "every tracker
+    // whose reminder hour is H" is an index seek, not a table scan.
+    reminderHour: t.integer("reminder_hour"),
     createdAt: t.integer("created_at", { mode: "timestamp" }).notNull(),
     updatedAt: t.integer("updated_at", { mode: "timestamp" }),
     archivedAt: t.integer("archived_at", { mode: "timestamp" }),
@@ -152,6 +156,10 @@ export const trackers = table(
       .index("IDX_trackers_user_id")
       .on(table.userId)
       .where(sql`${table.deletedAt} is null`),
+    t
+      .index("IDX_trackers_reminder_hour")
+      .on(table.reminderHour, table.userId)
+      .where(sql`${table.reminderHour} is not null and ${table.deletedAt} is null`),
   ],
 );
 
@@ -225,6 +233,15 @@ export const entries = table(
       .index("IDX_entries_tracker_id_local_date")
       .on(table.trackerId, table.localDate)
       .where(sql`${table.deletedAt} is null`),
+    // DEV_NOTE: backs NotificationsDAL.getOpenIntervalsForUsers (PR 4's open-interval nag) — an
+    // almost-empty partial index (at most one open interval per tracker at a time), so it costs
+    // nothing to maintain and turns "which of these users have a timer running" into an index seek.
+    t
+      .index("IDX_entries_open_interval")
+      .on(table.userId, table.occurredAt)
+      .where(
+        sql`${table.entryKind} = 'interval' and ${table.endedAt} is null and ${table.deletedAt} is null`,
+      ),
   ],
 );
 
@@ -294,4 +311,80 @@ export const dailyFacts = table(
     }),
     t.index("IDX_daily_facts_lookup").on(table.userId, table.metricId, table.localDate),
   ],
+);
+
+// DEV_NOTE: the endpoint unique index is global, not per-user, and partial on deleted_at is null —
+// a push service issues one endpoint per browser-install/origin pair, so if user A signs out and
+// user B signs in on the same machine, the browser hands back the same endpoint. Per-user uniqueness
+// would leave A's row live and deliver B's reminders to a channel A's device owns. Partial, like
+// tracker_targets above, so a soft-deleted row doesn't reserve the endpoint forever (invariant 9).
+export const pushSubscriptions = table(
+  "push_subscriptions",
+  {
+    id: t.int().primaryKey(),
+    publicId: t.text("public_id").notNull(),
+    userId: t.text("user_id").notNull(),
+    endpoint: t.text().notNull(),
+    p256dh: t.text().notNull(),
+    auth: t.text().notNull(),
+    deviceLabel: t.text("device_label").notNull(),
+    lastSeenAt: t.integer("last_seen_at", { mode: "timestamp" }).notNull(),
+    lastSentAt: t.integer("last_sent_at", { mode: "timestamp" }),
+    createdAt: t.integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: t.integer("updated_at", { mode: "timestamp" }),
+    deletedAt: t.integer("deleted_at", { mode: "timestamp" }),
+  },
+  (table) => [
+    t.uniqueIndex("UNQ_push_subscriptions_public_id").on(table.publicId),
+    t
+      .uniqueIndex("UNQ_push_subscriptions_endpoint")
+      .on(table.endpoint)
+      .where(sql`${table.deletedAt} is null`),
+    t
+      .index("IDX_push_subscriptions_user_id")
+      .on(table.userId)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
+// DEV_NOTE: its own table rather than columns on `users` — `users` is the auth identity row,
+// written by exactly one path (clerk-sync's upsert) and read by clerk_id in one place; handing a
+// settings screen a PATCH onto it widens the blast radius on the row every request authenticates
+// against. This preference set also grows (quiet hours, per-channel routing are the obvious next
+// asks), and widening `users` once per feature is how a five-column identity table becomes a junk
+// drawer. `tz` stays on `users` regardless — a locale fact invariant 4 already names, not a
+// notification preference.
+// DEV_NOTE: no publicId — architecture.md §4 grants one iff a row can appear in a URL, and this is
+// only ever addressed as "mine" (the authenticated user's own row). No deletedAt — turning every
+// trigger off is `false` on the row, not a delete; "no row" means never-configured (see
+// NOTIFICATION_PREFS_DEFAULTS). First `{ mode: "boolean" }` columns in the schema — flags, not
+// discrete states, so the Status Enum Pattern doesn't apply.
+export const notificationPrefs = table("notification_prefs", {
+  userId: t.text("user_id").primaryKey(),
+  trackerRemindersEnabled: t.integer("tracker_reminders_enabled", { mode: "boolean" }).notNull(),
+  streakDigestEnabled: t.integer("streak_digest_enabled", { mode: "boolean" }).notNull(),
+  streakDigestHour: t.integer("streak_digest_hour").notNull(),
+  openIntervalEnabled: t.integer("open_interval_enabled", { mode: "boolean" }).notNull(),
+  openIntervalThresholdMinutes: t.integer("open_interval_threshold_minutes").notNull(),
+  createdAt: t.integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: t.integer("updated_at", { mode: "timestamp" }),
+});
+
+// DEV_NOTE: the only atomic claim available with no KV and no Queue — a unique index in D1. The
+// dispatcher inserts BEFORE it sends; a conflict means somebody already claimed this
+// (user, dedupKey) — a cron retry, or two invocations in the same hour — and that branch skips.
+// Insert-before-send means a failed send is not retried, which is the right trade: a missed
+// reminder is a nuisance, a duplicate at 07:00 is why people turn notifications off.
+// DEV_NOTE: no publicId (never in a URL). No deletedAt — nothing ever deletes a row, so invariant 9
+// is satisfied trivially rather than by a column that would never be written.
+export const notificationSends = table(
+  "notification_sends",
+  {
+    userId: t.text("user_id").notNull(),
+    dedupKey: t.text("dedup_key").notNull(),
+    trigger: t.text().$type<Schemas.NotificationTrigger>().notNull(),
+    sentAt: t.integer("sent_at", { mode: "timestamp" }).notNull(),
+    createdAt: t.integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [t.primaryKey({ columns: [table.userId, table.dedupKey] })],
 );

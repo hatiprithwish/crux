@@ -16,6 +16,7 @@ type CreateTrackerParams = {
   sortOrder?: number;
   activeFrom: string;
   activeTo?: string | null;
+  reminderHour?: number | null;
 };
 
 export default class TrackersDAL {
@@ -44,6 +45,7 @@ export default class TrackersDAL {
           sortOrder: params.sortOrder ?? 0,
           activeFrom: params.activeFrom,
           activeTo: params.activeTo ?? null,
+          reminderHour: params.reminderHour ?? null,
           createdAt: now,
           updatedAt: null,
         })
@@ -82,6 +84,7 @@ export default class TrackersDAL {
       manifest?: Schemas.TrackerManifest;
       sortOrder?: number;
       activeFrom?: string;
+      reminderHour?: number | null;
     };
   }) {
     const response: Schemas.ApiResponse & { tracker?: Schemas.Tracker } = { isSuccess: false };
@@ -198,7 +201,8 @@ export default class TrackersDAL {
             params.archived ? isNotNull(trackers.archivedAt) : isNull(trackers.archivedAt),
             isNull(trackers.deletedAt),
           ),
-        );
+        )
+        .orderBy(asc(trackers.sortOrder), asc(trackers.id));
 
       response.isSuccess = true;
       response.message = "Trackers fetched successfully";
@@ -399,6 +403,53 @@ export default class TrackersDAL {
       AppLogger.error({
         category: Schemas.LogCategory.DAL,
         action: Schemas.LogAction.DeleteTracker,
+        message,
+        error,
+        metadata: params,
+      });
+      response.message = message;
+    }
+
+    return response;
+  }
+
+  // DEV_NOTE: one `db.batch` call, not N sequential updates — each row gets a different sortOrder,
+  // so this can't be the single "same value for every matching row" statement unarchiveAllTrackers
+  // uses. D1's batch runs every statement in one atomic round trip, which is what keeps two trackers
+  // from momentarily sharing a position if the worker were killed mid-loop.
+  async reorderTrackers(params: { userId: string; order: { id: number; sortOrder: number }[] }) {
+    const response: Schemas.ApiResponse = { isSuccess: false };
+
+    if (params.order.length === 0) {
+      response.isSuccess = true;
+      response.message = "Trackers reordered successfully";
+      return response;
+    }
+
+    try {
+      const now = new Date();
+      const statements = params.order.map(({ id, sortOrder }) =>
+        this.db
+          .update(trackers)
+          .set({ sortOrder, updatedAt: now })
+          .where(
+            and(
+              eq(trackers.id, id),
+              eq(trackers.userId, params.userId),
+              isNull(trackers.deletedAt),
+            ),
+          ),
+      );
+      const [first, ...rest] = statements;
+      await this.db.batch([first, ...rest]);
+
+      response.isSuccess = true;
+      response.message = "Trackers reordered successfully";
+    } catch (error) {
+      const message = "Unknown error in reordering trackers";
+      AppLogger.error({
+        category: Schemas.LogCategory.DAL,
+        action: Schemas.LogAction.ReorderTrackers,
         message,
         error,
         metadata: params,

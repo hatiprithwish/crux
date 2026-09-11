@@ -14,7 +14,6 @@ vi.mock("@tanstack/react-router", () => ({
 const mockQuickAdd = vi.fn();
 vi.mock("@/routes/_authenticated/trackers/-data", () => ({
   useQuickAdd: () => ({ mutate: mockQuickAdd, isPending: false }),
-  useArchiveTracker: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 // DEV_NOTE: EntityLinkFields owns five entity queries of its own — the controls that embed it
@@ -219,12 +218,5 @@ describe("TrackerRow", () => {
 
     render(<TrackerRow today={makeToday(tracker, { todaySum: 165, todayCount: 1 })} />);
     expect(screen.getByText("2m 45s")).toBeInTheDocument();
-  });
-
-  it("renders the archive option in the overflow menu", async () => {
-    const user = userEvent.setup();
-    render(<TrackerRow today={makeToday(makeTracker("toggle"))} />);
-    await user.click(screen.getByRole("button", { name: /tracker options/i }));
-    expect(await screen.findByRole("menuitem", { name: /archive/i })).toBeInTheDocument();
   });
 });

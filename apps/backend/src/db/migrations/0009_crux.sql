@@ -1,0 +1,1 @@
+CREATE INDEX `IDX_entries_open_interval` ON `entries` (`user_id`,`occurred_at`) WHERE "entries"."entry_kind" = 'interval' and "entries"."ended_at" is null and "entries"."deleted_at" is null;

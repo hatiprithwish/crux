@@ -2,7 +2,7 @@ name: Deploy Web (Staging)
 
 on:
   push:
-    branches: [staging]
+    # branches: [staging]
     paths:
       - "apps/web/**"
       - "packages/schemas/**"

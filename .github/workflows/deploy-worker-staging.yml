@@ -2,7 +2,7 @@ name: Deploy Worker (Staging)
 
 on:
   push:
-    branches: [staging]
+    # branches: [staging]
     paths:
       - "apps/backend/**"
       - "packages/schemas/**"

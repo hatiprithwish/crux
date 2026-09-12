@@ -161,7 +161,7 @@ describe("TrackerRow", () => {
 
     render(<TrackerRow today={makeToday(tracker)} />);
     await user.type(screen.getByRole("spinbutton", { name: /today's total/i }), "4");
-    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    await user.click(screen.getByRole("button", { name: /^save/i }));
 
     expect(mockQuickAdd).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -184,7 +184,7 @@ describe("TrackerRow", () => {
 
     render(<TrackerRow today={makeToday(tracker)} />);
     await user.type(screen.getByRole("spinbutton", { name: /today's total/i }), "4");
-    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    await user.click(screen.getByRole("button", { name: /^save/i }));
 
     expect(mockQuickAdd).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -200,7 +200,7 @@ describe("TrackerRow", () => {
 
     render(<TrackerRow today={makeToday(tracker)} />);
     await user.type(screen.getByRole("spinbutton", { name: /today's total/i }), "4");
-    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    await user.click(screen.getByRole("button", { name: /^save/i }));
 
     expect(mockQuickAdd).toHaveBeenCalledWith(
       expect.objectContaining({

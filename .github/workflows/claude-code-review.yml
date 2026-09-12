@@ -142,5 +142,4 @@ jobs:
             - Summary comment at the end with count
             - If NO violations, post: "✅ Pattern check passed! All rules satisfied."
 
-          claude_args: |
-            --allowedTools Write,Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(rg:*),Bash(grep:*)
+          claude_args: '--allowedTools "Write,Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(rg:*),Bash(grep:*)"'

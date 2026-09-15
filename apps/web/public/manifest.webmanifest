@@ -1,7 +1,7 @@
 {
-  "name": "Crux",
-  "short_name": "Crux",
-  "description": "A habit and metric tracker.",
+  "name": "Substrate",
+  "short_name": "Substrate",
+  "description": "The ground you build an intentional life on.",
   "start_url": "/trackers",
   "scope": "/",
   "display": "standalone",

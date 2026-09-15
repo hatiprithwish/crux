@@ -1,7 +1,31 @@
-# Crux — data model and approach (v2)
+# Substrate — data model and approach (v2)
 
 Consolidated from the full design discussion. Supersedes the earlier single-metric,
 single-entity sketch. Target: Cloudflare D1 (SQLite) + Drizzle ORM.
+
+---
+
+## 0. Why Substrate exists
+
+Substrate is a life companion for people who want to live intentionally and build a life
+they absolutely love. The user is the main character of their own life, and Substrate is
+where they see, track and improve every part of it. It aims to be the most important
+companion they have, and ideally the only one they need. This is the core of the app,
+and every section below serves it. Whatever solving that problem takes, we build, even
+when that means revisiting a decision in this document.
+
+What this asks of the architecture:
+
+- **Every part of a life, one substrate.** Health, money, time, work, relationships and
+  goals are all entries, metrics and entities. No domain is a silo, because the user's
+  life isn't one. Cross-domain views are the point, not a bonus.
+- **The user is in charge, never judged.** They define what matters (metrics,
+  trackers, targets) and the app adapts to them. Missing data is neutral (invariant 7),
+  and a lapse is never a failure state.
+- **Showing up must be effortless.** Logging friction is the main reason people stop,
+  and a companion that is abandoned helps nobody.
+- **This is their life story.** The data is as intimate as a diary, so it must be
+  trustworthy: kept private, isolated per user, exportable and deletable.
 
 ---
 

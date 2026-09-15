@@ -8,7 +8,7 @@
 // schema, so keep the two in sync by hand if either changes.
 
 self.addEventListener("push", (event) => {
-  let payload = { title: "Crux", body: "", url: "/trackers", tag: "crux-notification" };
+  let payload = { title: "Substrate", body: "", url: "/trackers", tag: "substrate-notification" };
   try {
     if (event.data) payload = { ...payload, ...event.data.json() };
   } catch {

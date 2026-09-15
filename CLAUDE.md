@@ -2,6 +2,17 @@
 
 > Non-negotiable. Every session.
 
+## North Star — the problem Substrate solves
+
+Substrate is a life companion for people who want to live intentionally and build a life they absolutely love. The user is the main character of their own life, and Substrate is where they see, track and improve every part of it. It aims to be the most important companion they have, and ideally the only one they need. This is the core of the app. Whatever solving that problem takes, we build.
+
+Check every feature, schema change and UI decision against it:
+
+- Does it help the user see their life more clearly, live it more intentionally, or improve it?
+- Does it keep them the main character: in charge, never managed, never judged?
+- Does it make showing up easier? Friction that adds no meaning is a defect.
+- If implementation convenience conflicts with the user's experience, the user wins.
+
 ## Principles
 
 - **Scan before code.** Read the closest golden file below before writing anything new. Mirror its naming, imports, and folder placement. No pre-existing pattern → flag it, don't assume.

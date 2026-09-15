@@ -1,4 +1,4 @@
-# Crux — implementation phases
+# Substrate — implementation phases
 
 Companion to `architecture.md`. That doc is the target state; this one is the order we get there
 in, broken into phases small enough to build, test, and ship independently. Each phase ends in a

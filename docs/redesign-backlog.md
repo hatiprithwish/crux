@@ -1,4 +1,4 @@
-# Crux — redesign backlog
+# Substrate — redesign backlog
 
 Companion to `architecture.md`. Tracks what the visual redesign (starting with the Today
 screen, see `design/`) surfaced but deliberately did not build in the first pass. Each

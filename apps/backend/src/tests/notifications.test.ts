@@ -21,7 +21,9 @@ import worker from "../index";
 import * as Schemas from "@app/schemas";
 
 declare module "cloudflare:test" {
-  interface ProvidedEnv extends Env {}
+  interface ProvidedEnv extends Env {
+    TEST_MIGRATIONS: D1Migration[];
+  }
 }
 
 // DEV_NOTE: same reasoning as orphanScan.test.ts — this session's remote D1 proxy connection is

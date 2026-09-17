@@ -1,4 +1,4 @@
 export * from "./DomainEnums";
 export * from "./EntitiesCommon";
-export * from "./EntriesCommon";
+export * from "./ObservationsCommon";
 export * from "./DailyFactsCommon";

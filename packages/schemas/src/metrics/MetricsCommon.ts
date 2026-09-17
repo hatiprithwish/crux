@@ -1,9 +1,17 @@
 import { z } from "zod";
-import { ZDateAttribution, ZDefaultAgg, ZDirection, ZSemanticType } from "../core/DomainEnums";
+import {
+  ZDateAttribution,
+  ZDefaultAgg,
+  ZDirection,
+  ZMetricDomain,
+  ZSemanticType,
+} from "../core/DomainEnums";
 
-// DEV_NOTE: declared globally per user, reused across trackers — see architecture.md §5 "metrics".
-// This is what makes cross-domain aggregation possible: two trackers pointing at the same metric
-// roll into one number.
+// DEV_NOTE: thinking.md Decision 4 — one global registry, not one per user. A metric is a kind of
+// quantity ("sleep duration"), and what it means in someone's life is decided by the areas they map
+// it into, never by a copy of the metric. Two trackers pointing at the same metric roll into one
+// number. Tracker forms still declare new metrics when the catalogue has nothing that fits; those
+// land here as `custom` rows. User-scoped metrics are deliberately not built yet.
 
 // Create Metric Body
 // DEV_NOTE: key/name/canonicalUnit are min(1) because a metric is global and permanent — an empty
@@ -30,6 +38,7 @@ export const ZMetricValues = z.object({
 });
 
 export const ZMetricBase = ZMetricValues.extend({
+  domain: ZMetricDomain.default("custom"),
   defaultAgg: ZDefaultAgg.default("sum"),
   defaultDirection: ZDirection.default("higher_better"),
   dateAttribution: ZDateAttribution.default("start"),
@@ -41,7 +50,6 @@ export type MetricBase = z.infer<typeof ZMetricBase>;
 export const ZMetric = ZMetricBase.extend({
   id: z.number(),
   publicId: z.string(),
-  userId: z.string(),
   createdAt: z.date(),
   updatedAt: z.date().nullable().optional(),
   deletedAt: z.date().nullable().optional(),
@@ -51,7 +59,7 @@ export type Metric = z.infer<typeof ZMetric>;
 // API response shape — id structurally omitted, publicId is client-facing
 export type MetricApiShape = Omit<Metric, "id" | "deletedAt">;
 
-// DEV_NOTE: a metric is global per user, so "can I delete this?" is not a question the client can
+// DEV_NOTE: a metric is global, so "can I delete this?" is not a question the client can
 // answer from the metric alone — it has to know what still points at it. trackerCount counts
 // trackers whose primary_metric_id is this metric; entryCount counts the readings already written
 // against it. Both non-zero means the metric is load-bearing history, not a mistake to clean up.

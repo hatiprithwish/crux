@@ -9,7 +9,9 @@ import OrphanScanRepo from "@/repositories/OrphanScanRepo";
 import Constants from "@/config/Constants";
 
 declare module "cloudflare:test" {
-  interface ProvidedEnv extends Env {}
+  interface ProvidedEnv extends Env {
+    TEST_MIGRATIONS: D1Migration[];
+  }
 }
 
 // DEV_NOTE: this session's remote D1 proxy connection has been visibly unstable throughout this

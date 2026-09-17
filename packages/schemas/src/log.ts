@@ -53,17 +53,20 @@ export enum LogAction {
   GetTrackerTargets = "GetTrackerTargets",
   DeleteTrackerTarget = "DeleteTrackerTarget",
 
-  // Substrate — entries
-  WriteEntry = "WriteEntry",
-  GetEntries = "GetEntries",
-  GetEntriesWithParts = "GetEntriesWithParts",
-  DeleteEntry = "DeleteEntry",
+  // Substrate — observation log (events + observations + event_entities -> daily_facts)
+  WriteEvent = "WriteEvent",
+  GetEvents = "GetEvents",
+  GetEventsWithParts = "GetEventsWithParts",
+  DeleteEvent = "DeleteEvent",
   GetDailyFacts = "GetDailyFacts",
-  UpdateEntryEndedAt = "UpdateEntryEndedAt",
-  AppendEntryValue = "AppendEntryValue",
-  GetOpenIntervalEntry = "GetOpenIntervalEntry",
   GetIntervalBreakdown = "GetIntervalBreakdown",
   GetDailyFactsForMetrics = "GetDailyFactsForMetrics",
+
+  // Substrate — running timers
+  StartSession = "StartSession",
+  GetOpenSession = "GetOpenSession",
+  GetOpenSessionsForDate = "GetOpenSessionsForDate",
+  StopSession = "StopSession",
 
   // Manifest engine — generic tracker surfaces (replaced the per-domain Habits/Money/Time actions)
   QuickAddEntry = "QuickAddEntry",

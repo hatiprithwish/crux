@@ -7,7 +7,9 @@ import worker from "../index";
 // contract (a stats row per entity, counts off entries, totals only where they combine), not the
 // row layout the DAL happens to return.
 declare module "cloudflare:test" {
-  interface ProvidedEnv extends Env {}
+  interface ProvidedEnv extends Env {
+    TEST_MIGRATIONS: D1Migration[];
+  }
 }
 
 const TEST_USER_ID = "user_test123";

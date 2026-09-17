@@ -29,6 +29,12 @@ export type SemanticType = z.infer<typeof ZSemanticType>;
 // enough for week/month/year (architecture.md §1). sum/min/max compose directly; avg does not
 // compose as an average of averages and is recomputed as SUM(sum)/SUM(count), which is only
 // possible because `count` is stored beside it.
+// DEV_NOTE: thinking.md Decision 4 — a shipped default for grouping and onboarding on the global
+// metric registry. It is not where a user decides what a metric means to them; per-user areas map
+// metrics M:N for that. `custom` is every metric a tracker form declared rather than the catalogue.
+export const ZMetricDomain = z.enum(["health", "money", "time", "mood", "custom"]);
+export type MetricDomain = z.infer<typeof ZMetricDomain>;
+
 export const ZDefaultAgg = z.enum(["sum", "avg", "max", "min"]);
 export type DefaultAgg = z.infer<typeof ZDefaultAgg>;
 

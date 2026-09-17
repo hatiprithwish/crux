@@ -6,7 +6,9 @@ import getDbClient from "@/db/dbClient";
 import { dailyFacts, entries, trackers } from "@/db/tables";
 // Declare env type for this test suite
 declare module "cloudflare:test" {
-  interface ProvidedEnv extends Env {}
+  interface ProvidedEnv extends Env {
+    TEST_MIGRATIONS: D1Migration[];
+  }
 }
 
 const TEST_USER_ID = "user_test123";

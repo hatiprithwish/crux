@@ -9,7 +9,9 @@ import getDbClient from "@/db/dbClient";
 import { dailyFacts } from "@/db/tables";
 
 declare module "cloudflare:test" {
-  interface ProvidedEnv extends Env {}
+  interface ProvidedEnv extends Env {
+    TEST_MIGRATIONS: D1Migration[];
+  }
 }
 
 // Mock logger to avoid logtape init overhead in tests

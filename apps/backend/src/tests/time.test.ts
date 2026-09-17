@@ -3,7 +3,9 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vites
 import worker from "../index";
 
 declare module "cloudflare:test" {
-  interface ProvidedEnv extends Env {}
+  interface ProvidedEnv extends Env {
+    TEST_MIGRATIONS: D1Migration[];
+  }
 }
 
 const mockAuthenticateRequest = vi.fn().mockResolvedValue({

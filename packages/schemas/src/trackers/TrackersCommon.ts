@@ -3,6 +3,7 @@ import { ZControl, ZDirection, ZEntryRole } from "../core/DomainEnums";
 import type { Direction, EntryKind, EntryRole, SemanticType } from "../core/DomainEnums";
 import { ZMetricBase } from "../metrics/MetricsCommon";
 import { ZComputeKey } from "./ComputeCommon";
+import type { TrackerPlanApiShape } from "../trackerPlans/TrackerPlansCommon";
 
 const ZLocalDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -294,6 +295,9 @@ export interface TrackerTodayApiShape {
   todayCount: number;
   streak: number;
   openSession: TrackerEntryApiShape | null; // timer trackers only
+  // DEV_NOTE: every live if-then plan, in the user's order — the row shows the first as a standing
+  // reminder and the capture sheet offers all of them as one-tap triggers, off this same request.
+  plans: TrackerPlanApiShape[];
 }
 
 // DEV_NOTE: the Today screen's 24h ruler — one tick per entry logged today, across every tracker.

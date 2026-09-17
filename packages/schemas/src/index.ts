@@ -4,5 +4,6 @@ export * from "./core";
 export * from "./entities";
 export * from "./metrics";
 export * from "./trackers";
+export * from "./trackerPlans";
 export * from "./log";
 export * from "./common";

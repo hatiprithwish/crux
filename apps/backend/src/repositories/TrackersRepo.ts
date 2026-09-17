@@ -1,6 +1,7 @@
 import EntitiesDAL from "@/data-access-layer/EntitiesDAL";
 import EntriesDAL from "@/data-access-layer/EntriesDAL";
 import MetricsDAL from "@/data-access-layer/MetricsDAL";
+import TrackerPlansDAL from "@/data-access-layer/TrackerPlansDAL";
 import TrackersDAL from "@/data-access-layer/TrackersDAL";
 import { factValue } from "@/manifest/Aggregation";
 import { planQuickAdd, type PlannedEntry } from "@/manifest/ControlHandlers";
@@ -38,9 +39,11 @@ export default class TrackersRepo {
   private entitiesDal: EntitiesDAL;
   private entriesDal: EntriesDAL;
   private metricsDal: MetricsDAL;
+  private trackerPlansDal: TrackerPlansDAL;
   private trackersDal: TrackersDAL;
 
   constructor(env: Env) {
+    this.trackerPlansDal = new TrackerPlansDAL(env);
     this.entitiesDal = new EntitiesDAL(env);
     this.entriesDal = new EntriesDAL(env);
     this.metricsDal = new MetricsDAL(env);
@@ -61,6 +64,17 @@ export default class TrackersRepo {
       deletedAt: _deletedAt,
       ...rest
     } = target;
+    return rest;
+  }
+
+  private toPlanApiShape(plan: Schemas.TrackerPlan): Schemas.TrackerPlanApiShape {
+    const {
+      id: _id,
+      userId: _userId,
+      trackerId: _trackerId,
+      deletedAt: _deletedAt,
+      ...rest
+    } = plan;
     return rest;
   }
 
@@ -536,7 +550,7 @@ export default class TrackersRepo {
     // widgets off a single query rather than N round trips against a remote D1 binding. The target
     // histories come back the same way, for the same reason: computeStreak needs the goal that was
     // in force on each day it walks, and N trackers must not become N extra queries.
-    const [factsResult, targetsResult] = await Promise.all([
+    const [factsResult, targetsResult, plansResult] = await Promise.all([
       this.entriesDal.getDailyFactsForMetrics({
         userId: params.userId,
         metricIds: trackers.map((tracker) => tracker.primaryMetricId),
@@ -547,12 +561,26 @@ export default class TrackersRepo {
         userId: params.userId,
         trackerIds: trackers.map((tracker) => tracker.id),
       }),
+      this.trackerPlansDal.getPlansForTrackers({
+        userId: params.userId,
+        trackerIds: trackers.map((tracker) => tracker.id),
+      }),
     ]);
     if (!factsResult.isSuccess) {
       return { isSuccess: false, message: factsResult.message };
     }
     if (!targetsResult.isSuccess) {
       return { isSuccess: false, message: targetsResult.message };
+    }
+    if (!plansResult.isSuccess) {
+      return { isSuccess: false, message: plansResult.message };
+    }
+
+    const plansByTracker = new Map<number, Schemas.TrackerPlanApiShape[]>();
+    for (const plan of plansResult.plans ?? []) {
+      const existing = plansByTracker.get(plan.trackerId) ?? [];
+      existing.push(this.toPlanApiShape(plan));
+      plansByTracker.set(plan.trackerId, existing);
     }
 
     // Grouped per tracker; rows arrive already ascending by effectiveFrom, and grouping preserves
@@ -603,6 +631,7 @@ export default class TrackersRepo {
         todayCount: todaySum === null ? 0 : 1,
         streak: computeStreak(sums, tracker, targets, today),
         openSession,
+        plans: plansByTracker.get(tracker.id) ?? [],
       });
 
       // DEV_NOTE: design/today-web.png's stat strip — computed off the sums/targets already loaded

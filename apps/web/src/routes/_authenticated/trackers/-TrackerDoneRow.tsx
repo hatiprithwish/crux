@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type * as Schemas from "@app/schemas";
+import { MomentCapture } from "./-MomentCapture";
 import { formatMetricValue } from "./-utils";
 
 interface TrackerDoneRowProps {
@@ -10,9 +11,9 @@ interface TrackerDoneRowProps {
 }
 
 // DEV_NOTE: design/today-mobile.png's collapsed "DONE" rows — "Morning walk · 32 min · 07:10". A
-// separate component from TrackerRow rather than a variant prop on it: nothing here is
-// interactive (no quick-add control, no options menu), so it doesn't share TrackerRow's props or
-// its per-control switch.
+// separate component from TrackerRow rather than a variant prop on it: there is no quick-add
+// control here (only moment capture), so it doesn't share TrackerRow's props or its per-control
+// switch.
 export function TrackerDoneRow({ today, lastOccurredAt }: TrackerDoneRowProps) {
   const tracker = today.tracker;
   const metric = tracker.metricDetails[0];
@@ -35,10 +36,15 @@ export function TrackerDoneRow({ today, lastOccurredAt }: TrackerDoneRowProps) {
           {tracker.name}
         </Link>
       </div>
-      <span className="text-sm tabular-nums">
-        {value}
-        {time ? ` · ${time}` : ""}
-      </span>
+      <div className="flex items-center gap-2">
+        <span className="text-sm tabular-nums">
+          {value}
+          {time ? ` · ${time}` : ""}
+        </span>
+        {/* DEV_NOTE: a habit being cut down lands here after its first slip of the day, which is
+            exactly when the next urge is likeliest — capture stays one tap away. */}
+        <MomentCapture tracker={tracker} plans={today.plans} />
+      </div>
     </div>
   );
 }

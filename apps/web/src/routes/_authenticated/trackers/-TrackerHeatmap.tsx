@@ -1,28 +1,13 @@
 import type * as Schemas from "@app/schemas";
-import { cn } from "@/utils/tailwind";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip";
-import { addDaysToLocalDate, dayOfWeek, formatDayLabel, formatMetricValue } from "./-utils";
-import TrackerDayTooltip from "./-TrackerDayTooltip";
+import { addDaysToLocalDate, dayOfWeek, useIsMobile } from "./-utils";
+import TrackerHeatmapCell, { STATE_CLASSES, STATE_LABELS } from "./-TrackerHeatmapCell";
+import { TrackerMonthCalendar } from "./-TrackerMonthCalendar";
 
 // DEV_NOTE: architecture.md §6 — grid position is client-side arithmetic over a server-supplied day
 // list; the server decides the state (it owns the schedule and target). Five states, and none of
 // them is "zero": a gap is neutral (invariant 7), an unscheduled day is not a miss, and nothing
-// renders before the tracker's activeFrom.
-const STATE_CLASSES: Record<Schemas.TrackerDayState, string> = {
-  not_active: "bg-transparent",
-  not_scheduled: "border border-border bg-transparent",
-  no_data: "bg-muted",
-  partial: "bg-primary/40",
-  met: "bg-primary",
-};
-
-const STATE_LABELS: Record<Schemas.TrackerDayState, string> = {
-  not_active: "before this tracker started",
-  not_scheduled: "not scheduled",
-  no_data: "nothing logged",
-  partial: "below target",
-  met: "met",
-};
+// renders before the tracker's activeFrom. The state colours and labels themselves live in
+// -TrackerHeatmapCell.tsx, shared with the mobile month calendar below.
 
 // DEV_NOTE: design/tracker-detail.png labels alternate rows only (M, W, F, S). Labelling all seven
 // makes a column of text as tall as the grid is wide, and the unlabelled rows are readable by
@@ -67,6 +52,12 @@ function formatMonth(localDate: string): string {
   });
 }
 
+// DEV_NOTE: a year spread across 52 columns only reads on a desktop window. Squeezed into a phone's
+// width the same grid becomes a stripe of illegible slivers — a fixed cell size with horizontal
+// scroll trades that for having to swipe through a year one week at a time either way, so mobile
+// gets a different layout instead: -TrackerMonthCalendar.tsx, one month per screen, paged, the same
+// shape every calendar app on a phone already uses. Same `days`, same five states, same tap-to-log —
+// only the arrangement changes.
 export default function TrackerHeatmap({
   days,
   metric,
@@ -74,12 +65,26 @@ export default function TrackerHeatmap({
   onSelectDay,
   selectedDate,
 }: TrackerHeatmapProps) {
+  const isMobile = useIsMobile();
+
   if (days.length === 0)
     return (
       <p className="border-b border-border px-6 py-5 text-sm text-muted-foreground">
         No days to show.
       </p>
     );
+
+  if (isMobile) {
+    return (
+      <TrackerMonthCalendar
+        days={days}
+        metric={metric}
+        note={note}
+        onSelectDay={onSelectDay}
+        selectedDate={selectedDate}
+      />
+    );
+  }
 
   // Pad the first week so the grid's rows line up with days of the week.
   const leadingBlanks = dayOfWeek(days[0].localDate);
@@ -108,72 +113,29 @@ export default function TrackerHeatmap({
           ))}
         </div>
 
-        {/* DEV_NOTE: auto-cols-fr, not fixed-width cells — a year's grid then spreads across
-            whatever width the column has instead of sitting in the left third of it. Row height is
-            fixed at h-4 rather than derived from the (variable) column width, because the weekday
-            labels beside it are a separate grid: anything that makes a cell's height depend on the
-            viewport puts the two grids out of step. min-w is what makes the overflow-x scroll kick
-            in on a phone instead of squeezing 52 weeks into 320px. */}
-        <div className="grid flex-1 auto-cols-fr grid-flow-col grid-rows-7 gap-1 sm:min-w-xl">
+        {/* DEV_NOTE: fixed-size cells (h-4 w-4), not auto-cols-fr — fr tracks stretch to fill
+            whatever width the grid box has *regardless of column count*, which reads fine at ~52
+            columns (each lands near 11px) but turns 3 columns (a tracker a few days old) into
+            three giant bars filling the same box. A fixed cell size makes the grid's own width
+            follow its column count instead — few weeks sit compact, many weeks overflow the
+            container and the wrapping `overflow-x-auto` above takes over. This branch only ever
+            renders on a desktop width now (the mobile calendar owns anything narrower). */}
+        <div className="grid auto-cols-min grid-flow-col grid-rows-7 gap-1">
           {Array.from({ length: leadingBlanks }, (_, index) =>
             addDaysToLocalDate(days[0].localDate, index - leadingBlanks),
           ).map((paddingDate) => (
-            <div key={`blank-${paddingDate}`} className="h-4 w-full rounded-xs" />
+            <div key={`blank-${paddingDate}`} className="h-4 w-4 rounded-xs" />
           ))}
-          {days.map((day) => {
-            const className = `h-4 w-full rounded-xs ${STATE_CLASSES[day.state]}`;
-
-            // A day before the tracker existed has nothing to log against and nothing to say — it is
-            // padding with a date, not a cell, so it gets no tooltip either.
-            if (day.state === "not_active") {
-              return <div key={day.localDate} className={className} />;
-            }
-
-            // DEV_NOTE: the same sentence the tooltip renders, flattened for a screen reader — the
-            // tooltip's own content is announced too, but only once focus reaches the cell, and a
-            // cell with no accessible name is unreachable by name in the first place.
-            const label = `${formatDayLabel(day.localDate)} — ${STATE_LABELS[day.state]}${
-              day.sum !== null && metric
-                ? `, ${formatMetricValue(day.sum, metric.semanticType, metric.canonicalUnit)}`
-                : ""
-            }`;
-            const canLog = Boolean(onSelectDay);
-
-            return (
-              <Tooltip key={day.localDate}>
-                <TooltipTrigger asChild>
-                  {canLog ? (
-                    <button
-                      type="button"
-                      onClick={() => onSelectDay?.(day.localDate)}
-                      // DEV_NOTE: the ring sits outside the cell (offset) rather than inside it — a
-                      // 16px-tall square with an inset ring reads as a different *state*, and the
-                      // five states are the only thing colour is allowed to mean in this grid.
-                      className={cn(
-                        className,
-                        "cursor-pointer transition-transform hover:scale-125 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background focus-visible:outline-none",
-                        selectedDate === day.localDate &&
-                          "ring-2 ring-primary ring-offset-1 ring-offset-background",
-                      )}
-                      aria-label={`Log ${label}`}
-                      aria-pressed={selectedDate === day.localDate}
-                    />
-                  ) : (
-                    // A read-only cell is still hoverable, and tabbable so the tooltip is reachable
-                    // without a mouse — it just has nothing to do when activated.
-                    <div className={className} tabIndex={0} role="img" aria-label={label} />
-                  )}
-                </TooltipTrigger>
-                <TooltipContent className="flex-col items-stretch">
-                  <TrackerDayTooltip
-                    day={day}
-                    metric={metric}
-                    hint={canLog ? "Click to log this day" : undefined}
-                  />
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
+          {days.map((day) => (
+            <TrackerHeatmapCell
+              key={day.localDate}
+              day={day}
+              metric={metric}
+              onSelectDay={onSelectDay}
+              selectedDate={selectedDate}
+              className="h-4 w-4 rounded-xs"
+            />
+          ))}
         </div>
       </div>
 

@@ -6,6 +6,7 @@ import AppLogger, { configureLogger, disposeLogger, withRequestContext } from "@
 import AuthRoutes from "@/routes/AuthRoutes";
 import UsersRoutes from "@/routes/UserRoutes";
 import TrackersRoutes from "@/routes/TrackersRoutes";
+import TrackerPlansRoutes from "@/routes/TrackerPlansRoutes";
 import EntitiesRoutes from "@/routes/EntitiesRoutes";
 import MetricsRoutes from "@/routes/MetricsRoutes";
 import NotificationsRoutes from "@/routes/NotificationsRoutes";
@@ -50,6 +51,7 @@ app.route("/users", UsersRoutes);
 // DEV_NOTE: the manifest engine's three surfaces replaced /habits, /money and /time — a tracker is
 // a row whose manifest says what it is (architecture.md §7 step 4), entities are the shared named
 // things any tracker links entries to, and metrics is what "reuse a metric" reads from.
+app.route("/trackers/:trackerPublicId", TrackerPlansRoutes);
 app.route("/trackers", TrackersRoutes);
 app.route("/entities", EntitiesRoutes);
 app.route("/metrics", MetricsRoutes);

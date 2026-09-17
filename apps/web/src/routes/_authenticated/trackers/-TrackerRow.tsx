@@ -9,6 +9,7 @@ import { DailyTotalControl } from "./-DailyTotalControl";
 import { TimerControl } from "./-TimerControl";
 import { AmountPadControl } from "./-AmountPadControl";
 import { FormControl } from "./-FormControl";
+import { MomentCapture } from "./-MomentCapture";
 import { describeSchedule, getTodayLocalDate } from "./-utils";
 
 // DEV_NOTE: architecture.md §6 — "One TrackerRow component, five child controls" (seven, as it
@@ -49,6 +50,7 @@ export default function TrackerRow({ today }: TrackerRowProps) {
   };
 
   const isRunning = tracker.manifest.control === "timer" && today.openSession !== null;
+  const topPlan = today.plans[0] ?? null;
 
   return (
     <div
@@ -82,13 +84,33 @@ export default function TrackerRow({ today }: TrackerRowProps) {
               {tracker.name}
             </Link>
           </span>
-          <span className="truncate text-xs text-muted-foreground">
-            {describeSchedule(tracker.manifest.schedule)}
-            {today.streak > 0 ? ` · ${today.streak} day streak` : ""}
-          </span>
+          {/* DEV_NOTE: the first if-then plan takes the schedule's place — seeing the plan every
+              time the row is read is the reminder; the schedule lives on the detail page. */}
+          {topPlan ? (
+            <span className="line-clamp-2 text-xs text-foreground/80 sm:truncate">
+              <span className="text-muted-foreground">If</span> {topPlan.cue}
+              {topPlan.response ? (
+                <>
+                  <span className="text-primary"> → </span>
+                  {topPlan.response}
+                </>
+              ) : null}
+              {today.streak > 0 ? (
+                <span className="text-muted-foreground"> · {today.streak} day streak</span>
+              ) : null}
+            </span>
+          ) : (
+            <span className="truncate text-xs text-muted-foreground">
+              {describeSchedule(tracker.manifest.schedule)}
+              {today.streak > 0 ? ` · ${today.streak} day streak` : ""}
+            </span>
+          )}
         </div>
       </div>
-      <div className="shrink-0">{renderControl(tracker.manifest.control, controlProps)}</div>
+      <div className="flex shrink-0 items-start gap-1">
+        {renderControl(tracker.manifest.control, controlProps)}
+        <MomentCapture tracker={tracker} plans={today.plans} />
+      </div>
     </div>
   );
 }

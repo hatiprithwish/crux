@@ -3,11 +3,13 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/tanstack-react-start";
 import { Button } from "@/shadcn/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shadcn/ui/tabs";
 import { TrackersQueries, useArchiveTracker, useRunCompute } from "../-data";
 import TrackerHeatmap from "../-TrackerHeatmap";
 import { TrackerBackfillPanel } from "../-TrackerBackfillPanel";
 import { TrackerDailyBars } from "../-TrackerDailyBars";
-import { TrackerEntryList } from "../-TrackerEntryList";
+import { MomentCapture } from "../-MomentCapture";
+import { TrackerTriggersTab } from "../-TrackerTriggersTab";
 import { deriveTrackerStats, TrackerStatStrip } from "../-TrackerStatStrip";
 import { TrackerTargetHistory } from "../-TrackerTargetHistory";
 import { TransferForm } from "../-TransferForm";
@@ -19,7 +21,7 @@ import {
   getTodayLocalDate,
 } from "../-utils";
 
-// DEV_NOTE: one detail page for every tracker — the heatmap, streak, entry log and breakdown are
+// DEV_NOTE: one detail page for every tracker — the heatmap, streak, plans and breakdown are
 // all generic reads now. What used to be three domain pages differs here only in which sections
 // apply: an interval tracker gets the breakdown, a compute tracker gets its module's form.
 //
@@ -28,7 +30,16 @@ import {
 // log) are exactly the kind that get better with the space. Sections are separated by full-width
 // rules with px-6 py-5 cells inside them, which is the form's rhythm, so the two screens read as
 // one app rather than two.
+const DETAIL_TABS = ["triggers", "history", "targets"] as const;
+
+// DEV_NOTE: the tab lives in the URL so a refresh, a back button or a shared link lands on the same
+// tab. Absent means Triggers — the if-then plan is the thing this page most wants the user to see
+// every time they open a tracker, so it opens there instead of behind a click. Anything
+// unrecognised in the URL is dropped rather than rejected.
 export const Route = createFileRoute("/_authenticated/trackers/$trackerId/")({
+  validateSearch: (search: Record<string, unknown>): { tab?: (typeof DETAIL_TABS)[number] } => ({
+    tab: DETAIL_TABS.find((tab) => tab === search.tab),
+  }),
   component: TrackerDetailPage,
 });
 
@@ -37,9 +48,7 @@ export const Route = createFileRoute("/_authenticated/trackers/$trackerId/")({
 // over four months both are mostly a statement about how recently the tracker was created.
 const HEATMAP_WINDOW_DAYS = 364;
 const BREAKDOWN_WINDOW_DAYS = 30;
-
-// The point at which the heatmap has enough marks on it to show a pattern rather than a receipt.
-const PATTERN_THRESHOLD_DAYS = 21;
+const MOMENTS_WINDOW_DAYS = 30;
 
 function formatActiveFrom(localDate: string): string {
   return new Date(`${localDate}T00:00:00.000Z`).toLocaleDateString("en-GB", {
@@ -62,6 +71,7 @@ function SectionHeading({ title, meta }: { title: string; meta?: string }) {
 
 function TrackerDetailPage() {
   const { trackerId } = Route.useParams();
+  const { tab = "triggers" } = Route.useSearch();
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const runCompute = useRunCompute();
@@ -70,19 +80,23 @@ function TrackerDetailPage() {
   const today = getTodayLocalDate();
   const heatmapFrom = addDaysToLocalDate(today, -(HEATMAP_WINDOW_DAYS - 1));
   const breakdownFrom = addDaysToLocalDate(today, -(BREAKDOWN_WINDOW_DAYS - 1));
+  const momentsFrom = addDaysToLocalDate(today, -(MOMENTS_WINDOW_DAYS - 1));
 
   // The heatmap cell the user opened for logging — null until one is clicked.
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const trackerQuery = useQuery(TrackersQueries.detail(trackerId, getToken));
   const heatmapQuery = useQuery(TrackersQueries.heatmap(trackerId, heatmapFrom, today, getToken));
-  const entriesQuery = useQuery(TrackersQueries.entries(trackerId, breakdownFrom, today, getToken));
   const targetsQuery = useQuery(TrackersQueries.targets(trackerId, getToken));
+  const plansQuery = useQuery(TrackersQueries.plans(trackerId, getToken));
+  const momentsQuery = useQuery({
+    ...TrackersQueries.moments(trackerId, momentsFrom, today, getToken),
+    enabled: tab === "triggers",
+  });
   const tracker = trackerQuery.data?.tracker;
   const isInterval = tracker?.manifest.control === "timer";
-  // DEV_NOTE: a one-day slice rather than a filter over the 30-day log above — the backfill panel
-  // reaches a year back, well past that window, and a day it can't see is a day whose control would
-  // render against an empty count.
+  // DEV_NOTE: a one-day slice — the backfill panel reaches a year back, and a day it can't see is a
+  // day whose control would render against an empty count.
   const selectedDayQuery = useQuery({
     ...TrackersQueries.entries(trackerId, selectedDate ?? today, selectedDate ?? today, getToken),
     enabled: selectedDate !== null,
@@ -99,14 +113,23 @@ function TrackerDetailPage() {
     return <div className="px-6 py-8 text-destructive">Failed to load tracker.</div>;
   }
 
-  const entries = entriesQuery.data?.entries ?? [];
-  const days = heatmapQuery.data?.days ?? [];
+  const plans = plansQuery.data?.plans ?? [];
+  const fetchedDays = heatmapQuery.data?.days ?? [];
+  // DEV_NOTE: the fetch always reaches back the full HEATMAP_WINDOW_DAYS regardless of when the
+  // tracker started (one query shape, cacheable across trackers of any age) — but rendering that
+  // whole window for a tracker created today is 52 weeks of "not_active" padding with nothing in
+  // it. Trimmed once here, so the grid, the bar chart, the mobile calendar's paging bounds and the
+  // streak/rate stats all agree on where the tracker's history actually begins, instead of each
+  // reader re-deriving its own idea of "before this tracker started".
+  const days = fetchedDays.filter((day) => day.localDate >= tracker.activeFrom);
   const stats = deriveTrackerStats(days);
   const primaryMetric =
     tracker.metricDetails.find((detail) => detail.key === tracker.primaryMetricKey) ?? null;
 
-  // DEV_NOTE: the % and best-streak cells claim "since active" only when the window actually
-  // reaches back past the day the tracker started — otherwise they are a slice, and say so.
+  // DEV_NOTE: the % and best-streak cells claim "since active" only when the fetch actually reached
+  // back to the day the tracker started — otherwise they are a slice of a longer history, and say
+  // so. Unrelated to the trim above: a tracker older than the fetch window still has its leading
+  // (unfetched) days absent, just not for the "nothing happened yet" reason this trim addresses.
   const coversStart = heatmapFrom <= tracker.activeFrom;
 
   // DEV_NOTE: the two cases the engine refuses a past date, checked here so the grid never offers a
@@ -117,16 +140,9 @@ function TrackerDetailPage() {
     ? (days.find((day) => day.localDate === selectedDate) ?? null)
     : null;
 
-  // Two facts about the grid, both worth saying under it: which days it couldn't cover, and
-  // whether the ones it did are clickable.
-  const heatmapNote = [
-    coversStart
-      ? `Tracker started ${formatActiveFrom(tracker.activeFrom)} — earlier days are not scheduled.`
-      : null,
-    canBackfill ? "Click a day to log it." : "This tracker only accepts entries for today.",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const heatmapNote = canBackfill
+    ? "Click a day to log it."
+    : "This tracker only accepts entries for today.";
 
   const eyebrow = [
     tracker.manifest.control.replace("_", " "),
@@ -163,6 +179,11 @@ function TrackerDetailPage() {
         </div>
 
         <div className="flex shrink-0 gap-2">
+          {/* DEV_NOTE: capture only makes sense next to the screen that shows today — on Triggers
+              or Targets there is no "today" on screen for a moment to be about. */}
+          {tab === "history" ? (
+            <MomentCapture tracker={tracker} plans={plans} variant="button" />
+          ) : null}
           <Button variant="outline" size="sm" onClick={() => navigate({ to: "/trackers" })}>
             Back
           </Button>
@@ -189,31 +210,44 @@ function TrackerDetailPage() {
         </div>
       </header>
 
-      {heatmapQuery.isError ? (
-        <p className="border-b border-border px-6 py-5 text-sm text-destructive">
-          Failed to load history.
-        </p>
-      ) : (
-        <TrackerStatStrip
-          stats={stats}
-          streak={heatmapQuery.data?.streak ?? 0}
-          windowDays={HEATMAP_WINDOW_DAYS}
-          coversStart={coversStart}
-          isPending={heatmapQuery.isPending}
-        />
-      )}
+      <Tabs
+        value={tab}
+        onValueChange={(next) =>
+          navigate({
+            to: ".",
+            search: { tab: DETAIL_TABS.find((known) => known === next) },
+            replace: true,
+          })
+        }
+        className="flex flex-1 flex-col gap-0"
+      >
+        <div className="overflow-x-auto border-b border-border px-6">
+          <TabsList variant="line" className="h-14!">
+            <TabsTrigger value="triggers">Triggers &amp; Preventions</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+            <TabsTrigger value="targets">Targets</TabsTrigger>
+          </TabsList>
+        </div>
 
-      {/* DEV_NOTE: the two columns run to the bottom of the viewport (flex-1 on the grid) so the
-          rule between them is a full-height division of the page rather than a line that stops
-          wherever the shorter column ran out of content. */}
-      <div className="grid flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="flex flex-col border-border lg:border-r">
+        <TabsContent value="history" className="flex flex-col">
+          {heatmapQuery.isError ? (
+            <p className="border-b border-border px-6 py-5 text-sm text-destructive">
+              Failed to load history.
+            </p>
+          ) : (
+            <TrackerStatStrip
+              stats={stats}
+              streak={heatmapQuery.data?.streak ?? 0}
+              windowDays={HEATMAP_WINDOW_DAYS}
+              coversStart={coversStart}
+              isPending={heatmapQuery.isPending}
+            />
+          )}
+
           <section>
             {heatmapQuery.isPending ? (
               <p className="px-6 py-5 text-sm text-muted-foreground">Loading history…</p>
-            ) : heatmapQuery.isError ? (
-              <p className="px-6 py-5 text-sm text-destructive">Failed to load history.</p>
-            ) : (
+            ) : heatmapQuery.isError ? null : (
               <TrackerHeatmap
                 days={days}
                 metric={primaryMetric}
@@ -238,17 +272,6 @@ function TrackerDetailPage() {
           {heatmapQuery.isSuccess && tracker.manifest.control !== "toggle" ? (
             <TrackerDailyBars days={days} metric={primaryMetric} />
           ) : null}
-
-          {/* DEV_NOTE: under the history it explains, not in the edit form. The edit form answers
-              "what am I aiming for", which is one number; this answers "what was I aiming for
-              then", which is the shape of the heatmap above it. */}
-          <TrackerTargetHistory
-            tracker={tracker}
-            metric={primaryMetric}
-            targets={targetsQuery.data?.targets ?? []}
-            isPending={targetsQuery.isPending}
-            isError={targetsQuery.isError}
-          />
 
           {tracker.manifest.compute === "money.transfer.v1" ? (
             <section>
@@ -294,39 +317,33 @@ function TrackerDetailPage() {
               )}
             </section>
           ) : null}
-        </div>
+        </TabsContent>
 
-        {/* DEV_NOTE: the log is a column beside the history on wide screens and a section under it
-            on narrow ones — the two answer different questions about the same days, and reading
-            one while the other is off-screen is what the old stacked-card layout forced. */}
-        <aside className="flex flex-col">
-          <SectionHeading
-            title={`Entries · last ${BREAKDOWN_WINDOW_DAYS} days`}
-            meta={entriesQuery.isSuccess ? String(entries.length) : undefined}
+        <TabsContent value="triggers">
+          <TrackerTriggersTab
+            tracker={tracker}
+            plans={plans}
+            plansPending={plansQuery.isPending}
+            plansError={plansQuery.isError}
+            moments={momentsQuery.data?.moments ?? []}
+            momentsPending={momentsQuery.isPending}
+            momentsError={momentsQuery.isError}
+            windowDays={MOMENTS_WINDOW_DAYS}
           />
+        </TabsContent>
 
-          {entriesQuery.isPending ? (
-            <p className="px-6 py-5 text-sm text-muted-foreground">Loading entries…</p>
-          ) : entriesQuery.isError ? (
-            <p className="px-6 py-5 text-sm text-destructive">Failed to load entries.</p>
-          ) : entries.length === 0 ? (
-            <p className="px-6 py-5 text-sm text-muted-foreground">
-              Nothing logged in this window.
-            </p>
-          ) : (
-            <TrackerEntryList entries={entries} tracker={tracker} />
-          )}
-
-          {/* DEV_NOTE: shown only until the history is long enough to read — it explains why the
-              grid beside it looks empty, which is the question a three-day-old tracker provokes. */}
-          {heatmapQuery.isSuccess && stats.daysLogged < PATTERN_THRESHOLD_DAYS ? (
-            <p className="px-6 py-5 text-sm leading-relaxed text-muted-foreground">
-              A three-week record is where the heatmap starts telling you something. Until then
-              it&apos;s a receipt.
-            </p>
-          ) : null}
-        </aside>
-      </div>
+        {/* DEV_NOTE: under its own tab, not in the edit form. The edit form answers "what am I
+            aiming for", which is one number; this answers "what was I aiming for then". */}
+        <TabsContent value="targets">
+          <TrackerTargetHistory
+            tracker={tracker}
+            metric={primaryMetric}
+            targets={targetsQuery.data?.targets ?? []}
+            isPending={targetsQuery.isPending}
+            isError={targetsQuery.isError}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import type * as Schemas from "@app/schemas";
 import Utilities from "@/utils";
 
@@ -362,4 +363,39 @@ export function describeSchedule(schedule: Schemas.TrackerSchedule): string {
   if (schedule.type === "every_n_days") return `Every ${schedule.intervalDays} days`;
   const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   return schedule.days.map((day) => names[day]).join(", ");
+}
+
+// DEV_NOTE: manifest.direction is resolved on write, but the type still allows null — fall back to
+// the primary metric's default rather than guessing.
+export function resolveTrackerDirection(tracker: Schemas.TrackerApiShape): Schemas.Direction {
+  if (tracker.manifest.direction) return tracker.manifest.direction;
+  const primary = tracker.metricDetails.find((metric) => metric.key === tracker.primaryMetricKey);
+  return primary?.defaultDirection ?? "higher_better";
+}
+
+// DEV_NOTE: one stored outcome (held/slipped), two readings — see TrackerMomentOutcomeIntEnum.
+export function momentOutcomeWords(direction: Schemas.Direction): {
+  held: string;
+  slipped: string;
+} {
+  return direction === "lower_better"
+    ? { held: "Resisted", slipped: "Gave in" }
+    : { held: "Followed plan", slipped: "Skipped" };
+}
+
+// DEV_NOTE: matches Tailwind's `sm` breakpoint (640px). Shared by the moment-capture sheet (bottom
+// sheet vs. side panel) and the heatmap (contribution grid vs. month calendar) — both pick a
+// genuinely different layout by viewport, not just a resized one, so the choice has to be made in
+// JS rather than fought over with conflicting CSS at two specificities (see -MomentCapture.tsx's
+// original DEV_NOTE on the sheet's `data-[side=x]` bug this replaced).
+export function useIsMobile(breakpointPx = 640): boolean {
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      const query = window.matchMedia(`(max-width: ${breakpointPx - 1}px)`);
+      query.addEventListener("change", onStoreChange);
+      return () => query.removeEventListener("change", onStoreChange);
+    },
+    () => window.matchMedia(`(max-width: ${breakpointPx - 1}px)`).matches,
+    () => true,
+  );
 }

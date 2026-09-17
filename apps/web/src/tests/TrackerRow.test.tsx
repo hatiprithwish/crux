@@ -14,6 +14,7 @@ vi.mock("@tanstack/react-router", () => ({
 const mockQuickAdd = vi.fn();
 vi.mock("@/routes/_authenticated/trackers/-data", () => ({
   useQuickAdd: () => ({ mutate: mockQuickAdd, isPending: false }),
+  useCreateTrackerMoment: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 // DEV_NOTE: EntityLinkFields owns five entity queries of its own — the controls that embed it
@@ -80,6 +81,7 @@ function makeToday(
     todayCount: 0,
     streak: 0,
     openSession: null,
+    plans: [],
     ...overrides,
   };
 }
@@ -100,6 +102,24 @@ describe("TrackerRow", () => {
   it("shows the streak once there is one", () => {
     render(<TrackerRow today={makeToday(makeTracker("toggle"), { streak: 4 })} />);
     expect(screen.getByText(/4 day streak/i)).toBeInTheDocument();
+  });
+
+  it("shows the first if-then plan in place of the schedule", () => {
+    const plan = {
+      publicId: "tpl_1",
+      cue: "Phone in bed",
+      response: "Charge it across the room",
+      sortOrder: 0,
+      createdAt: new Date(),
+      updatedAt: null,
+    };
+    render(<TrackerRow today={makeToday(makeTracker("toggle"), { plans: [plan] })} />);
+    expect(screen.getByText(/phone in bed/i)).toBeInTheDocument();
+    expect(screen.getByText(/charge it across the room/i)).toBeInTheDocument();
+    expect(screen.queryByText(/every day/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /log a trigger for test tracker/i }),
+    ).toBeInTheDocument();
   });
 
   // DEV_NOTE: the dispatch itself is the thing worth testing — manifest.control is the only reason

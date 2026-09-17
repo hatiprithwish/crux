@@ -18,6 +18,8 @@ export class TrackersQueries {
     breakdown: (publicId: string) => ["trackers", publicId, "breakdown"] as const,
     running: (publicId: string) => ["trackers", publicId, "running"] as const,
     targets: (publicId: string) => ["trackers", publicId, "targets"] as const,
+    plans: (publicId: string) => ["trackers", publicId, "plans"] as const,
+    moments: (publicId: string) => ["trackers", publicId, "moments"] as const,
     timeline: (date: string) => ["trackers", "timeline", date] as const,
   };
 
@@ -124,6 +126,33 @@ export class TrackersQueries {
         apiClient<Schemas.GetTrackerTargetsApiResponse>(`/trackers/${publicId}/targets`, getToken, {
           signal,
         }),
+    });
+  }
+
+  static plans(publicId: string, getToken: () => Promise<string | null>) {
+    return queryOptions({
+      queryKey: TrackersQueries.keys.plans(publicId),
+      queryFn: ({ signal }) =>
+        apiClient<Schemas.GetTrackerPlansApiResponse>(`/trackers/${publicId}/plans`, getToken, {
+          signal,
+        }),
+    });
+  }
+
+  static moments(
+    publicId: string,
+    from: string,
+    to: string,
+    getToken: () => Promise<string | null>,
+  ) {
+    return queryOptions({
+      queryKey: [...TrackersQueries.keys.moments(publicId), from, to] as const,
+      queryFn: ({ signal }) =>
+        apiClient<Schemas.GetTrackerMomentsApiResponse>(
+          `/trackers/${publicId}/moments?from=${from}&to=${to}`,
+          getToken,
+          { signal },
+        ),
     });
   }
 
@@ -413,3 +442,160 @@ export function useReorderTrackers() {
 // DEV_NOTE: MetricsQueries used to live here. It moved to metrics/-data.ts when metrics got a screen
 // of their own — a metric is a user-global resource (architecture.md §5), not a detail of the
 // tracker that happened to declare it.
+
+// DEV_NOTE: every plan write answers with the tracker's whole ordered list, so the plans cache is
+// written from the response. Only the list reads are invalidated on top (the Today row shows the
+// first plan) — keys.all() would also refetch a year of heatmap for a text edit.
+function usePlansCacheSync() {
+  const queryClient = useQueryClient();
+
+  return async (
+    publicId: string,
+    plans: Schemas.TrackerPlanApiShape[] | undefined,
+    message?: string,
+  ) => {
+    if (plans) {
+      queryClient.setQueryData<Schemas.GetTrackerPlansApiResponse>(
+        TrackersQueries.keys.plans(publicId),
+        { isSuccess: true, message, plans },
+      );
+    }
+    await queryClient.invalidateQueries({ queryKey: ["trackers", "list"] });
+  };
+}
+
+export function useCreateTrackerPlan() {
+  const { getToken } = useAuth();
+  const syncPlans = usePlansCacheSync();
+
+  return useMutation({
+    mutationFn: ({ publicId, plan }: { publicId: string; plan: Schemas.TrackerPlanBase }) =>
+      apiClient<Schemas.WriteTrackerPlansApiResponse>(`/trackers/${publicId}/plans`, getToken, {
+        method: "POST",
+        body: JSON.stringify({ plan }),
+      }),
+    onSuccess: async (response, { publicId }) => {
+      await syncPlans(publicId, response.plans, response.message);
+    },
+    onError: () => {
+      toast.error("Failed to save plan. Please try again.");
+    },
+  });
+}
+
+export function useUpdateTrackerPlan() {
+  const { getToken } = useAuth();
+  const syncPlans = usePlansCacheSync();
+
+  return useMutation({
+    mutationFn: ({
+      publicId,
+      planPublicId,
+      plan,
+    }: {
+      publicId: string;
+      planPublicId: string;
+      plan: Schemas.UpdateTrackerPlanApiRequest["plan"];
+    }) =>
+      apiClient<Schemas.WriteTrackerPlansApiResponse>(
+        `/trackers/${publicId}/plans/${planPublicId}`,
+        getToken,
+        { method: "PATCH", body: JSON.stringify({ plan }) },
+      ),
+    onSuccess: async (response, { publicId }) => {
+      await syncPlans(publicId, response.plans, response.message);
+    },
+    onError: () => {
+      toast.error("Failed to update plan. Please try again.");
+    },
+  });
+}
+
+export function useDeleteTrackerPlan() {
+  const { getToken } = useAuth();
+  const syncPlans = usePlansCacheSync();
+
+  return useMutation({
+    mutationFn: ({ publicId, planPublicId }: { publicId: string; planPublicId: string }) =>
+      apiClient<Schemas.WriteTrackerPlansApiResponse>(
+        `/trackers/${publicId}/plans/${planPublicId}`,
+        getToken,
+        { method: "DELETE" },
+      ),
+    onSuccess: async (response, { publicId }) => {
+      await syncPlans(publicId, response.plans, response.message);
+    },
+    onError: () => {
+      toast.error("Failed to remove plan. Please try again.");
+    },
+  });
+}
+
+export function useReorderTrackerPlans() {
+  const { getToken } = useAuth();
+  const syncPlans = usePlansCacheSync();
+
+  return useMutation({
+    mutationFn: ({ publicId, planPublicIds }: { publicId: string; planPublicIds: string[] }) =>
+      apiClient<Schemas.WriteTrackerPlansApiResponse>(
+        `/trackers/${publicId}/plans/reorder`,
+        getToken,
+        { method: "POST", body: JSON.stringify({ planPublicIds }) },
+      ),
+    onSuccess: async (response, { publicId }) => {
+      await syncPlans(publicId, response.plans, response.message);
+    },
+    onError: () => {
+      toast.error("Failed to reorder plans. Please try again.");
+    },
+  });
+}
+
+// DEV_NOTE: mutateAsync callers — the capture sheet awaits this before optionally logging an entry,
+// so a failed moment never leaves a stray entry behind it.
+export function useCreateTrackerMoment() {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+  const syncPlans = usePlansCacheSync();
+
+  return useMutation({
+    mutationFn: ({
+      publicId,
+      moment,
+    }: {
+      publicId: string;
+      moment: Schemas.CreateTrackerMomentApiRequest["moment"];
+    }) =>
+      apiClient<Schemas.CreateTrackerMomentApiResponse>(`/trackers/${publicId}/moments`, getToken, {
+        method: "POST",
+        body: JSON.stringify({ moment }),
+      }),
+    onSuccess: async (response, { publicId }) => {
+      await Promise.all([
+        syncPlans(publicId, response.plans, response.message),
+        queryClient.invalidateQueries({ queryKey: TrackersQueries.keys.moments(publicId) }),
+      ]);
+    },
+    onError: () => {
+      toast.error("Failed to save moment. Please try again.");
+    },
+  });
+}
+
+export function useDeleteTrackerMoment() {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ publicId, momentPublicId }: { publicId: string; momentPublicId: string }) =>
+      apiClient<Schemas.ApiResponse>(`/trackers/${publicId}/moments/${momentPublicId}`, getToken, {
+        method: "DELETE",
+      }),
+    onSuccess: async (_response, { publicId }) => {
+      await queryClient.invalidateQueries({ queryKey: TrackersQueries.keys.moments(publicId) });
+    },
+    onError: () => {
+      toast.error("Failed to remove moment. Please try again.");
+    },
+  });
+}

@@ -53,6 +53,16 @@ export enum LogAction {
   GetTrackerTargets = "GetTrackerTargets",
   DeleteTrackerTarget = "DeleteTrackerTarget",
 
+  // Substrate — tracker plans (if-then triggers) and moments (a trigger firing)
+  CreateTrackerPlan = "CreateTrackerPlan",
+  GetTrackerPlans = "GetTrackerPlans",
+  UpdateTrackerPlan = "UpdateTrackerPlan",
+  DeleteTrackerPlan = "DeleteTrackerPlan",
+  ReorderTrackerPlans = "ReorderTrackerPlans",
+  CreateTrackerMoment = "CreateTrackerMoment",
+  GetTrackerMoments = "GetTrackerMoments",
+  DeleteTrackerMoment = "DeleteTrackerMoment",
+
   // Substrate — entries
   WriteEntry = "WriteEntry",
   GetEntries = "GetEntries",

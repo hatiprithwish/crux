@@ -199,6 +199,64 @@ export const trackerTargets = table(
   ],
 );
 
+// DEV_NOTE: if-then plans — a trigger and what to do when it fires. Hangs off trackers only (not
+// entries) so it is untouched by any change to how readings are stored.
+export const trackerPlans = table(
+  "tracker_plans",
+  {
+    id: t.int().primaryKey(),
+    publicId: t.text("public_id").notNull(),
+    userId: t.text("user_id").notNull(),
+    trackerId: t.integer("tracker_id").notNull(),
+    cue: t.text().notNull(),
+    response: t.text(),
+    sortOrder: t.integer("sort_order").notNull().default(0),
+    createdAt: t.integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: t.integer("updated_at", { mode: "timestamp" }),
+    deletedAt: t.integer("deleted_at", { mode: "timestamp" }),
+  },
+  (table) => [
+    t.uniqueIndex("UNQ_tracker_plans_public_id").on(table.publicId),
+    t
+      .index("IDX_tracker_plans_tracker_id")
+      .on(table.trackerId, table.sortOrder)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
+// DEV_NOTE: a trigger firing — held or slipped. Never read by scoring; see ZTrackerMoment.
+export const trackerMoments = table(
+  "tracker_moments",
+  {
+    id: t.int().primaryKey(),
+    publicId: t.text("public_id").notNull(),
+    userId: t.text("user_id").notNull(),
+    trackerId: t.integer("tracker_id").notNull(),
+    planId: t.integer("plan_id"),
+    momentOutcome: t
+      .integer("moment_outcome")
+      .$type<Schemas.TrackerMomentOutcomeIntEnum>()
+      .notNull(),
+    localDate: t.text("local_date").notNull(), // YYYY-MM-DD, UTC day like entries.local_date
+    occurredAt: t.integer("occurred_at", { mode: "timestamp" }).notNull(),
+    note: t.text(),
+    createdAt: t.integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: t.integer("updated_at", { mode: "timestamp" }),
+    deletedAt: t.integer("deleted_at", { mode: "timestamp" }),
+  },
+  (table) => [
+    t.uniqueIndex("UNQ_tracker_moments_public_id").on(table.publicId),
+    t
+      .index("IDX_tracker_moments_tracker_id_local_date")
+      .on(table.trackerId, table.localDate)
+      .where(sql`${table.deletedAt} is null`),
+    t
+      .index("IDX_tracker_moments_plan_id")
+      .on(table.planId)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
 // DEV_NOTE: entries is the append-mostly raw log — the source of truth. entry_values/entry_entities
 // (below) carry the actual readings/links; daily_facts is a derived, disposable cache written only
 // by EntriesDAL. See architecture.md §5 "entries".

@@ -243,7 +243,14 @@ function valuesFromTracker(tracker: Schemas.TrackerApiShape): TrackerFormValues 
     tileKey: tile.key,
     entryMode: manifest.entryMode,
     scheduleType: manifest.schedule.type,
-    scheduleDays: manifest.schedule.type === "days_of_week" ? manifest.schedule.days : [],
+    // DEV_NOTE: manifest_json is read back with a cast, not a parse (TrackersDAL), so a row written
+    // before `days` was required on this branch — or corrupted by hand — can carry no array here.
+    // Falling back to [] keeps the day-tile grid (which calls .includes/.filter on this value)
+    // from crashing on an old tracker instead of surfacing that as a schedule with no days picked.
+    scheduleDays:
+      manifest.schedule.type === "days_of_week" && Array.isArray(manifest.schedule.days)
+        ? manifest.schedule.days
+        : [],
     scheduleCount: manifest.schedule.type === "times_per_week" ? manifest.schedule.count : 3,
     target: manifest.target === null ? "" : String(toDisplay(manifest.target, seededUnit)),
     // DEV_NOTE: step converts alongside target because it is the same kind of number — a stepper on

@@ -316,7 +316,7 @@ export default class NotificationsRepo {
       for (const chunk of Utility.chunk(hourUserIds)) {
         const trackersResult = await this.dal.getTrackersDueForReminder({ userIds: chunk, hour });
         for (const tracker of trackersResult.trackers ?? []) {
-          if (!isScheduled(utcDate, tracker.manifestJson.schedule)) continue;
+          if (!isScheduled(utcDate, tracker.manifestJson.schedule, tracker.activeFrom)) continue;
           targets.push({
             userId: tracker.userId,
             trackerPublicId: tracker.publicId,

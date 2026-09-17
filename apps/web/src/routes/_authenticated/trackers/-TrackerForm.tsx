@@ -65,9 +65,10 @@ const ZTrackerFormValues = z
     icon: z.string().nullable(),
     tileKey: z.string(),
     entryMode: z.enum(["live", "retro"]),
-    scheduleType: z.enum(["daily", "days_of_week", "times_per_week"]),
+    scheduleType: z.enum(["daily", "days_of_week", "times_per_week", "every_n_days"]),
     scheduleDays: z.array(z.number().min(0).max(6)),
     scheduleCount: z.number().int().min(1).max(7),
+    scheduleIntervalDays: z.number().int().min(2).max(365),
     target: z.string(),
     step: z.string(),
     // DEV_NOTE: always a concrete unit in form state, never null — the field has to hold an answer
@@ -127,6 +128,7 @@ const SCHEDULE_OPTIONS: { value: TrackerFormValues["scheduleType"]; label: strin
   { value: "daily", label: "Every day" },
   { value: "days_of_week", label: "Some days" },
   { value: "times_per_week", label: "N per week" },
+  { value: "every_n_days", label: "Every N days" },
 ];
 
 const REMINDER_HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => hour);
@@ -213,6 +215,9 @@ function buildSchedule(values: TrackerFormValues): Schemas.TrackerSchedule {
   if (values.scheduleType === "times_per_week") {
     return { type: "times_per_week", count: values.scheduleCount };
   }
+  if (values.scheduleType === "every_n_days") {
+    return { type: "every_n_days", intervalDays: values.scheduleIntervalDays };
+  }
   return { type: "daily" };
 }
 
@@ -252,6 +257,11 @@ function valuesFromTracker(tracker: Schemas.TrackerApiShape): TrackerFormValues 
         ? manifest.schedule.days
         : [],
     scheduleCount: manifest.schedule.type === "times_per_week" ? manifest.schedule.count : 3,
+    scheduleIntervalDays:
+      manifest.schedule.type === "every_n_days" &&
+      typeof manifest.schedule.intervalDays === "number"
+        ? manifest.schedule.intervalDays
+        : 2,
     target: manifest.target === null ? "" : String(toDisplay(manifest.target, seededUnit)),
     // DEV_NOTE: step converts alongside target because it is the same kind of number — a stepper on
     // a duration metric moves by a quantity the user typed, and leaving one of the two in canonical
@@ -323,6 +333,7 @@ export function TrackerForm({
         scheduleType: "daily",
         scheduleDays: [],
         scheduleCount: 3,
+        scheduleIntervalDays: 2,
         target: "",
         step: "",
         // DEV_NOTE: "minutes" rather than "seconds" as the starting answer — a duration tracker is
@@ -657,6 +668,26 @@ export function TrackerForm({
                         onBlur={field.handleBlur}
                         className={cn(UNDERLINE_INPUT, "w-24")}
                       />
+                    )}
+                  </form.Field>
+                ) : scheduleType === "every_n_days" ? (
+                  <form.Field name="scheduleIntervalDays">
+                    {(field) => (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Every</span>
+                        <Input
+                          type="number"
+                          min="2"
+                          max="365"
+                          aria-label="Interval in days"
+                          value={field.state.value}
+                          onChange={(event) => field.handleChange(event.target.valueAsNumber)}
+                          onBlur={field.handleBlur}
+                          className={cn(UNDERLINE_INPUT, "w-20")}
+                        />
+                        <span>days</span>
+                        <FieldError errors={field.state.meta.errors} />
+                      </div>
                     )}
                   </form.Field>
                 ) : null

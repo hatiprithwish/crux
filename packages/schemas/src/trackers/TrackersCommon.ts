@@ -25,6 +25,10 @@ export const ZTrackerSchedule = z.discriminatedUnion("type", [
   z.object({ type: z.literal("daily") }),
   z.object({ type: z.literal("days_of_week"), days: z.array(z.number().min(0).max(6)) }),
   z.object({ type: z.literal("times_per_week"), count: z.number() }),
+  // DEV_NOTE: cadence counts from the tracker's own `activeFrom`, not a field on the schedule
+  // itself — day 0 is the day the tracker went active, so "every 2 days" set on day one and left
+  // alone always lands on the same days. No anchor field to keep in sync with anything.
+  z.object({ type: z.literal("every_n_days"), intervalDays: z.number().int().min(2).max(365) }),
 ]);
 export type TrackerSchedule = z.infer<typeof ZTrackerSchedule>;
 

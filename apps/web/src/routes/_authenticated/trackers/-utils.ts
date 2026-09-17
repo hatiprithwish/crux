@@ -359,6 +359,7 @@ export const LINKABLE_KINDS: Schemas.EntryRole[] = ["project", "person", "place"
 export function describeSchedule(schedule: Schemas.TrackerSchedule): string {
   if (schedule.type === "daily") return "Every day";
   if (schedule.type === "times_per_week") return `${schedule.count}× per week`;
+  if (schedule.type === "every_n_days") return `Every ${schedule.intervalDays} days`;
   const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   return schedule.days.map((day) => names[day]).join(", ");
 }

@@ -16,11 +16,29 @@ function dayOfWeek(localDate: string): number {
   return new Date(`${localDate}T00:00:00.000Z`).getUTCDay();
 }
 
+function daysBetween(fromLocalDate: string, toLocalDate: string): number {
+  const from = new Date(`${fromLocalDate}T00:00:00.000Z`).getTime();
+  const to = new Date(`${toLocalDate}T00:00:00.000Z`).getTime();
+  return Math.round((to - from) / (1000 * 60 * 60 * 24));
+}
+
 // DEV_NOTE: a "times_per_week" schedule names a count, not days — so every day is an opportunity
 // and none is a miss. Returning true here is what keeps invariant 7 honest for that shape: an
 // unlogged day renders as no-data, never as a failure.
-export function isScheduled(localDate: string, schedule: Schemas.TrackerSchedule): boolean {
+//
+// DEV_NOTE: `activeFrom` is "every_n_days"'s anchor (day 0), not a field on the schedule itself —
+// see ZTrackerSchedule's DEV_NOTE. A date before activeFrom can go negative here; dayState already
+// short-circuits to "not_active" before calling this, and the modulo of a negative still lands on
+// 0 for exact multiples, so nothing downstream needs to guard against it.
+export function isScheduled(
+  localDate: string,
+  schedule: Schemas.TrackerSchedule,
+  activeFrom: string,
+): boolean {
   if (schedule.type === "days_of_week") return schedule.days.includes(dayOfWeek(localDate));
+  if (schedule.type === "every_n_days") {
+    return daysBetween(activeFrom, localDate) % schedule.intervalDays === 0;
+  }
   return true;
 }
 
@@ -50,7 +68,8 @@ export function dayState(
   target: number | null,
 ): Schemas.TrackerDayState {
   if (localDate < tracker.activeFrom) return "not_active";
-  if (!isScheduled(localDate, tracker.manifest.schedule)) return "not_scheduled";
+  if (!isScheduled(localDate, tracker.manifest.schedule, tracker.activeFrom))
+    return "not_scheduled";
   if (!sums.has(localDate)) return "no_data";
 
   // DEV_NOTE: a neutral tracker states there is no better side to be on, so a logged day is met and

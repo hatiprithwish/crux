@@ -21,6 +21,7 @@ export type TrackerDueForReminder = {
   userId: string;
   name: string;
   manifestJson: Schemas.TrackerManifest;
+  activeFrom: string;
 };
 
 // DEV_NOTE: what the open-interval nag needs — entryPublicId to build the dedup bucket key,
@@ -416,6 +417,7 @@ export default class NotificationsDAL {
             userId: trackers.userId,
             name: trackers.name,
             manifestJson: trackers.manifestJson,
+            activeFrom: trackers.activeFrom,
           })
           .from(trackers)
           .where(

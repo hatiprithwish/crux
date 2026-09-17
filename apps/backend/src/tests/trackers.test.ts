@@ -1080,6 +1080,46 @@ describe("Trackers — heatmap + streak", () => {
   });
 });
 
+describe("Trackers — every_n_days schedule", () => {
+  let trackerPublicId: string;
+
+  beforeAll(async () => {
+    // activeFrom is day 0 of the cadence — intervalDays: 2 makes it and every second day after
+    // "scheduled", the days in between "not_scheduled" (Scoring.ts's isScheduled).
+    const tracker = await createTracker({
+      tracker: {
+        name: "Every N Days Habit",
+        manifest: { ...habitManifest(), schedule: { type: "every_n_days", intervalDays: 2 } },
+        activeFrom: dayBefore(4),
+      },
+      metric: newMetricSpec("Every N Days Habit"),
+    });
+    trackerPublicId = tracker.publicId;
+  });
+
+  afterAll(async () => {
+    await archiveTracker(trackerPublicId);
+  });
+
+  it("marks days off the cadence not_scheduled and days on it no_data, unaffected by logging", async () => {
+    const res = await worker.fetch(
+      makeRequest(`/trackers/${trackerPublicId}/heatmap?from=${dayBefore(4)}&to=${today}`),
+      testEnv,
+      createExecutionContext(),
+    );
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { days: { localDate: string; state: string }[] };
+    const byDate = Object.fromEntries(body.days.map((day) => [day.localDate, day.state]));
+
+    expect(byDate[dayBefore(4)]).toBe("no_data"); // 0 days since activeFrom — on cadence
+    expect(byDate[dayBefore(3)]).toBe("not_scheduled"); // 1 day since — off cadence
+    expect(byDate[dayBefore(2)]).toBe("no_data"); // 2 days since — on cadence
+    expect(byDate[dayBefore(1)]).toBe("not_scheduled");
+    expect(byDate[today]).toBe("no_data"); // 4 days since — on cadence
+  });
+});
+
 describe("Trackers — today timeline", () => {
   let loggedPublicId: string;
   let unloggedPublicId: string;

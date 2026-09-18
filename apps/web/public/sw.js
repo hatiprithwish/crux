@@ -7,12 +7,17 @@
 // packages/schemas/src/notifications/NotificationsCommon.ts — this file can't import that Zod
 // schema, so keep the two in sync by hand if either changes.
 
+// Take over as soon as a new version installs, instead of waiting for every open tab to close.
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+
 self.addEventListener("push", (event) => {
   let payload = { title: "Neuron", body: "", url: "/trackers", tag: "neuron-notification" };
   try {
     if (event.data) payload = { ...payload, ...event.data.json() };
   } catch {
-    // Malformed payload — fall back to the generic notification below rather than showing nothing.
+    // Non-JSON payload (e.g. DevTools' Push button sends plain text) — show the raw text as the body.
+    payload.body = event.data.text();
   }
 
   // DEV_NOTE: showNotification MUST be called — userVisibleOnly: true (required by Chrome at
@@ -22,6 +27,8 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(payload.title, {
       body: payload.body,
       tag: payload.tag,
+      // Same-tag pushes replace the existing notification; without renotify the replacement is silent.
+      renotify: true,
       icon: "/favicons/android-chrome-192x192.png",
       badge: "/favicons/favicon-32x32.png",
       data: { url: payload.url },

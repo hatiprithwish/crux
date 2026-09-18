@@ -67,29 +67,15 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 export function AppSidebar() {
-  const dayNumber = useDayNumber();
-
   return (
-    // DEV_NOTE: sticky + h-screen, not the shell's full height. The page scrolls in document flow,
-    // so a sidebar sized by the flex row grows with the tallest screen's content and takes its
-    // footer — Archived and the user button — below the fold. Pinned to the viewport instead, the
-    // footer is always reachable and the nav takes its own scrollbar if the list ever outgrows it.
     <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
       <div className="shrink-0 px-5 pt-6 pb-4">
         <div className="flex items-center gap-2">
           <img src="/neuron-logo.png" alt="" className="size-6" />
           <p className="font-heading text-xl font-bold text-sidebar-foreground">neuron</p>
         </div>
-        {dayNumber !== null && (
-          <p className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
-            Day {dayNumber}
-          </p>
-        )}
       </div>
 
-      {/* flex-1 so the footer stays pinned to the bottom now that nothing grows between them.
-          min-h-0 lets it shrink below its content height on a short viewport instead of pushing
-          the footer out of the pinned column. */}
       <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-5">
         <NavLinks />
       </nav>

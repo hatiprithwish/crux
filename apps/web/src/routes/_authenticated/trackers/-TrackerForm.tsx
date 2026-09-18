@@ -736,7 +736,6 @@ export function TrackerForm({
                   onValueChange={(value) =>
                     field.handleChange(value === "none" ? null : Number(value))
                   }
-                  modal={false}
                 >
                   <SelectTrigger id={field.name} className={UNDERLINE_TRIGGER}>
                     <SelectValue />
@@ -804,7 +803,6 @@ export function TrackerForm({
                                   onValueChange={(value) =>
                                     unitField.handleChange(value as Schemas.DisplayUnit)
                                   }
-                                  modal={false}
                                 >
                                   <SelectTrigger
                                     aria-label="Unit the target and every entry are typed in"
@@ -915,7 +913,6 @@ export function TrackerForm({
                         value={field.state.value}
                         onValueChange={(value) => field.handleChange(value as Schemas.Direction)}
                         disabled={targetDisabled}
-                        modal={false}
                       >
                         <SelectTrigger id={field.name} className={UNDERLINE_TRIGGER}>
                           <SelectValue />
@@ -991,7 +988,6 @@ export function TrackerForm({
                 <Select
                   value={field.state.value}
                   onValueChange={(value) => field.handleChange(value as "live" | "retro")}
-                  modal={false}
                 >
                   <SelectTrigger id={field.name} className={UNDERLINE_TRIGGER}>
                     <SelectValue />
@@ -1093,7 +1089,6 @@ export function TrackerForm({
                                 <Select
                                   value={field.state.value}
                                   onValueChange={applyExistingMetric}
-                                  modal={false}
                                 >
                                   <SelectTrigger
                                     id={field.name}
@@ -1169,7 +1164,6 @@ export function TrackerForm({
                                 onValueChange={(value) =>
                                   applySemanticType(value as Schemas.SemanticType)
                                 }
-                                modal={false}
                               >
                                 <SelectTrigger id={field.name} className="w-full">
                                   <SelectValue />
@@ -1227,7 +1221,6 @@ export function TrackerForm({
                                 onValueChange={(value) =>
                                   field.handleChange(value as Schemas.DefaultAgg)
                                 }
-                                modal={false}
                               >
                                 <SelectTrigger id={field.name} className="w-full">
                                   <SelectValue />

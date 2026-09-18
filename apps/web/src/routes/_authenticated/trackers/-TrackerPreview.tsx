@@ -64,7 +64,7 @@ export function TrackerPreview({
   return (
     <div className="flex flex-col">
       <section className="border-b border-border px-6 py-5">
-        <h2 className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+        <h2 className="text-2xs font-medium tracking-widest text-muted-foreground uppercase">
           How it will look on Today
         </h2>
 
@@ -98,7 +98,7 @@ export function TrackerPreview({
       </section>
 
       <section className="border-b border-border px-6 py-5">
-        <h2 className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+        <h2 className="text-2xs font-medium tracking-widest text-muted-foreground uppercase">
           {isExistingMetric ? "What it writes into" : "What gets written"}
         </h2>
 

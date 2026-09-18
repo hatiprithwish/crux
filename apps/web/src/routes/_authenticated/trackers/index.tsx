@@ -150,8 +150,8 @@ function TrackersPage() {
       ) : trackers.length === 0 ? (
         <div className="flex flex-col gap-4 px-6 py-10">
           <div className="flex flex-col gap-2">
-            <h2 className="text-xl font-medium">An empty rule.</h2>
-            <h2 className="text-xl font-medium">Put one mark on it.</h2>
+            <h2 className="text-xl font-semibold">An empty rule.</h2>
+            <h2 className="text-xl font-semibold">Put one mark on it.</h2>
             <p className="max-w-md text-sm text-muted-foreground">
               One tracker is enough to find out whether the habit holds. The other five can wait
               until it does.

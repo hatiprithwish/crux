@@ -93,7 +93,7 @@ export default function TrackerHeatmap({
   return (
     <div className="flex flex-col border-b border-border">
       <div className="flex items-baseline justify-between gap-4 border-b border-border px-6 py-2.5">
-        <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+        <p className="text-2xs font-medium tracking-widest text-muted-foreground uppercase">
           History · {weeks} weeks
         </p>
         <p className="text-xs text-muted-foreground">
@@ -106,7 +106,7 @@ export default function TrackerHeatmap({
           {WEEKDAY_ROWS.map((row) => (
             <span
               key={row.day}
-              className="flex h-4 items-center text-[0.625rem] leading-none text-muted-foreground"
+              className="flex h-4 items-center text-2xs leading-none text-muted-foreground"
             >
               {row.label}
             </span>
@@ -140,7 +140,7 @@ export default function TrackerHeatmap({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 pb-5">
-        <div className="flex flex-wrap gap-x-4 gap-y-2 text-[0.625rem] tracking-wide text-muted-foreground uppercase">
+        <div className="flex flex-wrap gap-x-4 gap-y-2 text-2xs tracking-wide text-muted-foreground uppercase">
           {(Object.keys(STATE_LABELS) as Schemas.TrackerDayState[])
             .filter((state) => state !== "not_active")
             .map((state) => (

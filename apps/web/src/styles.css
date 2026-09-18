@@ -1,22 +1,52 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/figtree";
-@import "@fontsource-variable/ibm-plex-sans";
+@import "@fontsource-variable/manrope";
 
 @custom-variant dark (&:is(.dark *));
 
 /* DEV_NOTE: safety net, not the fix — a row that's still too wide for its viewport (a stray
    fixed-width control, a long unbroken tracker name) should clip rather than open a page-wide
-   horizontal scrollbar on mobile. */
+   horizontal scrollbar on mobile. `clip`, not `hidden` — any non-visible overflow-x on html/body
+   forces overflow-y to compute as auto, turning them into their own scroll containers instead of
+   the real viewport and breaking `position: sticky` everywhere (AppSidebar). `clip` blocks the
+   horizontal scrollbar the same way without that side effect. */
 html,
 body {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: "IBM Plex Sans Variable", sans-serif;
+  --font-sans: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
+
+  /* DEV_NOTE: the whole ramp sits a step above Tailwind's defaults with looser leading — Neuron
+     should read calm and roomy, not like a ledger packing every pixel. `2xs` is the floor for
+     uppercase eyebrow labels and chart axis ticks; nothing in the app goes smaller. */
+  --text-2xs: 0.75rem;
+  --text-2xs--line-height: 1.125rem;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.5rem;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.75rem;
+  --text-lg: 1.1875rem;
+  --text-lg--line-height: 1.875rem;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 2rem;
+  --text-2xl: 1.625rem;
+  --text-2xl--line-height: 2.25rem;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 2.5rem;
+  --text-4xl: 2.5rem;
+  --text-4xl--line-height: 3rem;
+  --color-brand-purple: var(--brand-purple);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-cyan: var(--brand-cyan);
+  --color-brand-gold: var(--brand-gold);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-white: var(--brand-white);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -62,75 +92,92 @@ body {
    scrollbars, autofill. Without it every one of those renders light-mode, which is why the calendar
    icon was black-on-black in dark mode. Declaring it here rather than filtering the icon per input
    fixes the whole class of them at once, including controls added later. */
+/* Brand palette — Aurora Purple #8B5CF6, Electric Blue #3B82F6, Cyan #22D3EE,
+   Aurora Gold #FBBF24, Deep Navy #07152D, Soft White #F8FAFC. Every semantic token below
+   derives from these; neutrals carry the navy hue (~260) so greys read as part of the family. */
 :root {
   color-scheme: light;
+  --brand-purple: oklch(0.606 0.219 292.7);
+  --brand-blue: oklch(0.623 0.188 259.8);
+  --brand-cyan: oklch(0.797 0.134 211.5);
+  --brand-gold: oklch(0.837 0.164 84.4);
+  --brand-navy: oklch(0.199 0.052 260.1);
+  --brand-white: oklch(0.984 0.003 247.9);
+
   --background: oklch(1 0 0);
-  --foreground: oklch(0.148 0.004 228.8);
+  --foreground: oklch(0.199 0.052 260.1);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.148 0.004 228.8);
+  --card-foreground: oklch(0.199 0.052 260.1);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.148 0.004 228.8);
-  --primary: oklch(0.8 0.15 165);
-  --primary-foreground: oklch(0.148 0.004 228.8);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.963 0.002 197.1);
-  --muted-foreground: oklch(0.56 0.021 213.5);
-  --accent: oklch(0.8 0.15 165);
-  --accent-foreground: oklch(0.148 0.004 228.8);
+  --popover-foreground: oklch(0.199 0.052 260.1);
+  --primary: oklch(0.606 0.219 292.7);
+  --primary-foreground: oklch(0.984 0.003 247.9);
+  --secondary: oklch(0.967 0.006 286.4);
+  --secondary-foreground: oklch(0.28 0.034 262);
+  --muted: oklch(0.965 0.006 258);
+  --muted-foreground: oklch(0.552 0.031 259);
+  --accent: oklch(0.606 0.219 292.7);
+  --accent-foreground: oklch(0.984 0.003 247.9);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.925 0.005 214.3);
-  --input: oklch(0.925 0.005 214.3);
-  --ring: oklch(0.8 0.15 165);
-  --chart-1: oklch(0.8 0.15 165);
-  --chart-2: oklch(0.768 0.233 130.85);
-  --chart-3: oklch(0.648 0.2 131.684);
-  --chart-4: oklch(0.532 0.157 131.589);
-  --chart-5: oklch(0.453 0.124 130.933);
+  --border: oklch(0.923 0.01 257);
+  --input: oklch(0.923 0.01 257);
+  --ring: oklch(0.606 0.219 292.7);
+  --chart-1: oklch(0.606 0.219 292.7);
+  --chart-2: oklch(0.623 0.188 259.8);
+  --chart-3: oklch(0.797 0.134 211.5);
+  --chart-4: oklch(0.837 0.164 84.4);
+  --chart-5: oklch(0.452 0.192 296);
   --radius: 0rem;
-  --sidebar: oklch(0.987 0.002 197.1);
-  --sidebar-foreground: oklch(0.148 0.004 228.8);
-  --sidebar-primary: oklch(0.8 0.15 165);
-  --sidebar-primary-foreground: oklch(0.148 0.004 228.8);
-  --sidebar-accent: oklch(0.963 0.002 197.1);
-  --sidebar-accent-foreground: oklch(0.218 0.008 223.9);
-  --sidebar-border: oklch(0.925 0.005 214.3);
-  --sidebar-ring: oklch(0.8 0.15 165);
+  --sidebar: oklch(0.985 0.005 258);
+  --sidebar-foreground: oklch(0.199 0.052 260.1);
+  --sidebar-primary: oklch(0.606 0.219 292.7);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.9);
+  --sidebar-accent: oklch(0.963 0.007 258);
+  --sidebar-accent-foreground: oklch(0.28 0.034 262);
+  --sidebar-border: oklch(0.923 0.01 257);
+  --sidebar-ring: oklch(0.606 0.219 292.7);
 }
 
 .dark {
   color-scheme: dark;
-  --background: oklch(0.16 0.004 250);
-  --foreground: oklch(0.96 0.002 197.1);
-  --card: oklch(0.2 0.006 250);
-  --card-foreground: oklch(0.96 0.002 197.1);
-  --popover: oklch(0.2 0.006 250);
-  --popover-foreground: oklch(0.96 0.002 197.1);
-  --primary: oklch(0.8 0.15 165);
-  --primary-foreground: oklch(0.148 0.004 228.8);
-  --secondary: oklch(0.26 0.006 250);
-  --secondary-foreground: oklch(0.96 0.002 197.1);
-  --muted: oklch(0.24 0.006 250);
-  --muted-foreground: oklch(0.65 0.014 214.4);
-  --accent: oklch(0.8 0.15 165);
-  --accent-foreground: oklch(0.148 0.004 228.8);
+  --brand-purple: oklch(0.606 0.219 292.7);
+  --brand-blue: oklch(0.623 0.188 259.8);
+  --brand-cyan: oklch(0.797 0.134 211.5);
+  --brand-gold: oklch(0.837 0.164 84.4);
+  --brand-navy: oklch(0.199 0.052 260.1);
+  --brand-white: oklch(0.984 0.003 247.9);
+
+  --background: oklch(0.199 0.052 260.1);
+  --foreground: oklch(0.984 0.003 247.9);
+  --card: oklch(0.245 0.046 260);
+  --card-foreground: oklch(0.984 0.003 247.9);
+  --popover: oklch(0.245 0.046 260);
+  --popover-foreground: oklch(0.984 0.003 247.9);
+  --primary: oklch(0.672 0.205 292.7);
+  --primary-foreground: oklch(0.984 0.003 247.9);
+  --secondary: oklch(0.3 0.045 260);
+  --secondary-foreground: oklch(0.984 0.003 247.9);
+  --muted: oklch(0.272 0.044 260);
+  --muted-foreground: oklch(0.72 0.031 258);
+  --accent: oklch(0.672 0.205 292.7);
+  --accent-foreground: oklch(0.984 0.003 247.9);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.8 0.15 165);
-  --chart-1: oklch(0.8 0.15 165);
-  --chart-2: oklch(0.768 0.233 130.85);
-  --chart-3: oklch(0.648 0.2 131.684);
-  --chart-4: oklch(0.532 0.157 131.589);
-  --chart-5: oklch(0.453 0.124 130.933);
-  --sidebar: oklch(0.13 0.004 250);
-  --sidebar-foreground: oklch(0.96 0.002 197.1);
-  --sidebar-primary: oklch(0.8 0.15 165);
-  --sidebar-primary-foreground: oklch(0.148 0.004 228.8);
-  --sidebar-accent: oklch(0.22 0.006 250);
-  --sidebar-accent-foreground: oklch(0.96 0.002 197.1);
+  --ring: oklch(0.672 0.205 292.7);
+  --chart-1: oklch(0.672 0.205 292.7);
+  --chart-2: oklch(0.623 0.188 259.8);
+  --chart-3: oklch(0.797 0.134 211.5);
+  --chart-4: oklch(0.837 0.164 84.4);
+  --chart-5: oklch(0.452 0.192 296);
+  --sidebar: oklch(0.165 0.046 260);
+  --sidebar-foreground: oklch(0.984 0.003 247.9);
+  --sidebar-primary: oklch(0.672 0.205 292.7);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.9);
+  --sidebar-accent: oklch(0.228 0.046 260);
+  --sidebar-accent-foreground: oklch(0.984 0.003 247.9);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.8 0.15 165);
+  --sidebar-ring: oklch(0.672 0.205 292.7);
 }
 
 @layer base {
@@ -146,6 +193,14 @@ body {
   }
   html {
     @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading font-semibold tracking-tight;
   }
   input[type="number"] {
     -moz-appearance: textfield;
@@ -155,6 +210,14 @@ body {
     -webkit-appearance: none;
     margin: 0;
   }
+}
+
+/* DEV_NOTE: unlayered on purpose — shadcn hardcodes `font-medium` on its title slots and
+   `src/shadcn/ui/` is off-limits, so only a rule outside every layer outranks that utility. */
+[data-slot="card-title"],
+[data-slot="sheet-title"],
+[data-slot="popover-title"] {
+  font-weight: 600;
 }
 
 /* Sentry's feedback button lives in a shadow root — only its --font-size custom property

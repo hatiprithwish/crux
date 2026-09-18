@@ -102,7 +102,7 @@ function EntitiesPage() {
       ) : visible.length === 0 ? (
         <div className="flex flex-col gap-4 px-6 py-10">
           <div className="flex flex-col gap-2">
-            <h2 className="text-xl font-medium">Nothing of this kind yet.</h2>
+            <h2 className="text-xl font-semibold">Nothing of this kind yet.</h2>
             <p className="max-w-md text-sm text-muted-foreground">
               {KIND_LABELS[kind].toLowerCase()} are what entries point at — the account a spend came
               out of, the project an hour went into. Make one when a tracker needs somewhere to file
@@ -116,7 +116,7 @@ function EntitiesPage() {
       ) : (
         <>
           <div className="flex items-baseline justify-between gap-4 border-b border-border px-6 py-2.5">
-            <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+            <p className="text-2xs font-medium tracking-widest text-muted-foreground uppercase">
               {visible.length} {KIND_LABELS[kind]}
             </p>
             {/* DEV_NOTE: absent, never zero, when the kind's totals don't combine — see

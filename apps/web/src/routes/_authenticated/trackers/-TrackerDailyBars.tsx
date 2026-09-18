@@ -48,7 +48,7 @@ export function TrackerDailyBars({ days, metric }: TrackerDailyBarsProps) {
   return (
     <section className="flex flex-col border-b border-border">
       <div className="flex items-baseline justify-between gap-4 border-b border-border px-6 py-2.5">
-        <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+        <p className="text-2xs font-medium tracking-widest text-muted-foreground uppercase">
           {metric ? metric.name : "Per day"} · per day
         </p>
         <p className="text-xs text-muted-foreground">
@@ -117,7 +117,7 @@ export function TrackerDailyBars({ days, metric }: TrackerDailyBarsProps) {
         })}
       </div>
 
-      <div className="flex justify-between px-6 py-3 text-[0.625rem] tracking-wide text-muted-foreground uppercase tabular-nums">
+      <div className="flex justify-between px-6 py-3 text-2xs tracking-wide text-muted-foreground uppercase tabular-nums">
         <span>{formatBarDate(window[0].localDate)}</span>
         <span>{formatBarDate(window[window.length - 1].localDate)}</span>
       </div>

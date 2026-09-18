@@ -24,7 +24,7 @@ function CategoryHeader({ category, ...props }: EmojiPickerListCategoryHeaderPro
   return (
     <div
       {...props}
-      className="flex items-end bg-popover px-3 pb-1.5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase"
+      className="flex items-end bg-popover px-3 pb-1.5 text-2xs font-medium tracking-widest text-muted-foreground uppercase"
     >
       {category.label}
     </div>

@@ -151,7 +151,7 @@ export function MomentCapture({ tracker, plans, variant = "icon" }: MomentCaptur
           {/* DEV_NOTE: the plan is shown at the moment it matters most — while the urge is live. */}
           {selectedPlan ? (
             <div className="rounded-lg border border-border px-4 py-3 text-sm">
-              <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+              <p className="text-2xs font-medium tracking-widest text-muted-foreground uppercase">
                 Your plan
               </p>
               <p className="mt-1">

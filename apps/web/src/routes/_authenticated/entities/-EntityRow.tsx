@@ -52,7 +52,7 @@ export default function EntityRow({ entity, stats }: EntityRowProps) {
         {stats?.total ? (
           <span
             className={cn(
-              "shrink-0 text-lg tabular-nums",
+              "shrink-0 text-lg font-semibold tabular-nums",
               // A negative total is the one number in this list that means something different from
               // its magnitude — money owed rather than money held — so it is the only one coloured.
               (stats.total.value ?? 0) < 0 ? "text-primary" : "text-foreground",

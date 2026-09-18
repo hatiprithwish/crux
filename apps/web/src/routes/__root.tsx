@@ -51,13 +51,15 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       // DEV_NOTE: iOS makes the manifest (and this) mandatory, not optional — Safari only offers
       // "Add to Home Screen" as an installable app when a manifest with display: "standalone" is
       // present, and Web Push on iOS 16.4+ only works for a site installed that way.
-      { name: "theme-color", content: "#41dca5" },
+      { name: "theme-color", content: "#8B5CF6" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
-      { rel: "manifest", href: "/manifest.webmanifest" },
-      { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
+      { rel: "icon", type: "image/x-icon", href: "/favicons/favicon.ico" },
+      { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicons/favicon-16x16.png" },
+      { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicons/favicon-32x32.png" },
+      { rel: "manifest", href: "/favicons/site.webmanifest" },
+      { rel: "apple-touch-icon", href: "/favicons/apple-touch-icon.png" },
     ],
   }),
   // DEV_NOTE: TooltipProvider is mounted app-wide because Radix's Tooltip.Root *throws* without a

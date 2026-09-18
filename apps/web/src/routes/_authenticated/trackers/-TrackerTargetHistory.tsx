@@ -104,7 +104,7 @@ export function TrackerTargetHistory({
   return (
     <section className="flex flex-col border-b border-border">
       <div className="flex items-baseline justify-between gap-4 border-b border-border px-6 py-2.5">
-        <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+        <p className="text-2xs font-medium tracking-widest text-muted-foreground uppercase">
           Target history
         </p>
         <p className="text-xs text-muted-foreground tabular-nums">
@@ -187,7 +187,7 @@ export function TrackerTargetHistory({
             <div className="flex min-w-40 flex-col gap-2">
               <label
                 htmlFor={field.name}
-                className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase"
+                className="text-2xs font-medium tracking-widest text-muted-foreground uppercase"
               >
                 In force from
               </label>
@@ -209,7 +209,7 @@ export function TrackerTargetHistory({
             <div className="flex min-w-32 flex-col gap-2">
               <label
                 htmlFor={field.name}
-                className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase"
+                className="text-2xs font-medium tracking-widest text-muted-foreground uppercase"
               >
                 Target{suffix ? ` · ${suffix}` : ""}
               </label>

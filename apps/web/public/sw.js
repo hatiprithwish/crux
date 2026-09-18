@@ -22,8 +22,8 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(payload.title, {
       body: payload.body,
       tag: payload.tag,
-      icon: "/icons/icon-192.png",
-      badge: "/icons/badge-72.png",
+      icon: "/favicons/android-chrome-192x192.png",
+      badge: "/favicons/favicon-32x32.png",
       data: { url: payload.url },
     }),
   );

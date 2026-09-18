@@ -51,7 +51,7 @@ export function TrackerPlanForm({
             <div className="flex flex-col gap-1.5">
               <label
                 htmlFor={`${idPrefix}-${field.name}`}
-                className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase"
+                className="text-2xs font-medium tracking-widest text-muted-foreground uppercase"
               >
                 If
               </label>
@@ -74,7 +74,7 @@ export function TrackerPlanForm({
             <div className="flex flex-col gap-1.5">
               <label
                 htmlFor={`${idPrefix}-${field.name}`}
-                className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase"
+                className="text-2xs font-medium tracking-widest text-muted-foreground uppercase"
               >
                 Then
               </label>

@@ -21,8 +21,8 @@ interface CellProps {
 function Cell({ value, label }: CellProps) {
   return (
     <div className="flex flex-col gap-1 border-r border-border px-6 py-5 last:border-r-0">
-      <span className="font-heading text-2xl leading-none font-light tabular-nums">{value}</span>
-      <span className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+      <span className="font-heading text-2xl leading-none font-semibold tabular-nums">{value}</span>
+      <span className="text-2xs font-medium tracking-widest text-muted-foreground uppercase">
         {label}
       </span>
     </div>

@@ -100,7 +100,7 @@ export function TrackerMonthCalendar({
   return (
     <div className="flex flex-col border-b border-border">
       <div className="flex items-center justify-between gap-4 border-b border-border px-6 py-2.5">
-        <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+        <p className="text-2xs font-medium tracking-widest text-muted-foreground uppercase">
           History
         </p>
         <div className="flex items-center gap-1">
@@ -133,7 +133,7 @@ export function TrackerMonthCalendar({
           {WEEKDAY_COLUMNS.map((column) => (
             <span
               key={column.day}
-              className="flex h-4 items-center justify-center text-[0.625rem] leading-none text-muted-foreground"
+              className="flex h-4 items-center justify-center text-2xs leading-none text-muted-foreground"
             >
               {column.label}
             </span>
@@ -164,7 +164,7 @@ export function TrackerMonthCalendar({
       </div>
 
       <div className="flex flex-col gap-2 px-6 pb-5">
-        <div className="flex flex-wrap gap-x-4 gap-y-2 text-[0.625rem] tracking-wide text-muted-foreground uppercase">
+        <div className="flex flex-wrap gap-x-4 gap-y-2 text-2xs tracking-wide text-muted-foreground uppercase">
           {(Object.keys(STATE_LABELS) as Schemas.TrackerDayState[])
             .filter((state) => state !== "not_active")
             .map((state) => (

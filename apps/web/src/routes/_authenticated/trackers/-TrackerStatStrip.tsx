@@ -66,14 +66,14 @@ function Stat({ value, unit, label, accent }: StatProps) {
     <div className="flex flex-col gap-1.5 border-r border-border px-6 py-5 last:border-r-0">
       <span
         className={cn(
-          "font-heading text-3xl leading-none font-light tabular-nums",
+          "font-heading text-3xl leading-none font-semibold tabular-nums",
           accent ? "text-primary" : "text-foreground",
         )}
       >
         {value}
         {unit ? <span className="ml-0.5 text-base text-muted-foreground">{unit}</span> : null}
       </span>
-      <span className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+      <span className="text-2xs font-medium tracking-widest text-muted-foreground uppercase">
         {label}
       </span>
     </div>

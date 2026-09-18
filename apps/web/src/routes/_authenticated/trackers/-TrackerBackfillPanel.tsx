@@ -41,7 +41,7 @@ export function TrackerBackfillPanel({
   return (
     <section className="border-b border-border">
       <div className="flex items-center justify-between gap-4 border-b border-border px-6 py-2.5">
-        <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+        <p className="text-2xs font-medium tracking-widest text-muted-foreground uppercase">
           Log · {formatDayLabel(day.localDate)}
         </p>
         <div className="flex items-center gap-3">

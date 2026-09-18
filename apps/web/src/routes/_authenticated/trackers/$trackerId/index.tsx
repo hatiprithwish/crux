@@ -61,7 +61,7 @@ function formatActiveFrom(localDate: string): string {
 function SectionHeading({ title, meta }: { title: string; meta?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border px-6 py-2.5">
-      <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+      <p className="text-2xs font-medium tracking-widest text-muted-foreground uppercase">
         {title}
       </p>
       {meta ? <p className="text-xs text-muted-foreground tabular-nums">{meta}</p> : null}

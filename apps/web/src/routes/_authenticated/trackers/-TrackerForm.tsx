@@ -1327,7 +1327,7 @@ const UNDERLINE_TRIGGER =
 function SectionHeading({ index, title }: { index: number; title: string }) {
   return (
     <div className="border-b border-border px-6 py-2.5">
-      <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+      <p className="text-2xs font-medium tracking-widest text-muted-foreground uppercase">
         {index} · {title}
       </p>
     </div>
@@ -1360,7 +1360,7 @@ function FieldLabelText({ htmlFor, children }: { htmlFor?: string; children: Rea
   return (
     <label
       htmlFor={htmlFor}
-      className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase"
+      className="text-2xs font-medium tracking-widest text-muted-foreground uppercase"
     >
       {children}
     </label>

@@ -105,6 +105,7 @@ export default function TrackerRow({ today }: TrackerRowProps) {
                   {plan.response ? (
                     <>
                       <span className="text-primary"> → </span>
+                      <span className="text-muted-foreground">Then </span>
                       {plan.response}
                     </>
                   ) : null}

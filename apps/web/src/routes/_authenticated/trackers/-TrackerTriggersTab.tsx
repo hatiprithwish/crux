@@ -157,6 +157,7 @@ export function TrackerTriggersTab({
                             <span className="text-muted-foreground">If </span>
                             <span className="font-medium">{plan.cue}</span>
                             <span className="text-primary"> → </span>
+                            <span className="text-muted-foreground">Then </span>
                             {plan.response ?? (
                               <span className="text-muted-foreground italic">no plan yet</span>
                             )}

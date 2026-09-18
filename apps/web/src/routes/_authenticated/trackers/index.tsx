@@ -14,9 +14,10 @@ import { TrackerDoneRow } from "./-TrackerDoneRow";
 import { TodayStatStrip } from "./-TodayStatStrip";
 import { getTodayLocalDate } from "./-utils";
 
-// DEV_NOTE: architecture.md §6 "Today screen" — every tracker, each rendering the quick-add widget
-// its manifest.control names, off one request (?withToday=true returns the day's totals, streaks
-// and now todayStats alongside the trackers).
+// DEV_NOTE: architecture.md §6 "Today screen" — every tracker due today, each rendering the
+// quick-add widget its manifest.control names, off one request (?withToday=true returns the day's
+// totals, streaks, isDueToday and todayStats alongside the trackers). The full list, due or not,
+// lives on /trackers/all.
 export const Route = createFileRoute("/_authenticated/trackers/")({
   component: TrackersPage,
 });
@@ -36,6 +37,13 @@ function formatTodayLabel(localDate: string): string {
 // written today, or (for a timer) a session still running.
 function isLogged(row: Schemas.TrackerTodayApiShape): boolean {
   return row.todaySum !== null || row.openSession !== null;
+}
+
+// DEV_NOTE: Today shows what the day asks for, plus anything already logged today even if it
+// wasn't asked for — a log made from a tracker's detail page on an off day stays visible in Done
+// rather than vanishing.
+function isOnToday(row: Schemas.TrackerTodayApiShape): boolean {
+  return row.isDueToday || isLogged(row);
 }
 
 function moveItem<T>(list: T[], from: number, to: number): T[] {
@@ -72,12 +80,15 @@ function TrackersPage() {
     return map;
   }, [timeline.data?.entries]);
 
+  const allRows = data?.today ?? [];
+  const todayRows = useMemo(() => (data?.today ?? []).filter(isOnToday), [data?.today]);
+
   const filteredRows = useMemo(() => {
-    const rows = data?.today ?? [];
+    const rows = todayRows;
     const needle = query.trim().toLowerCase();
     if (!needle) return rows;
     return rows.filter((row) => row.tracker.name.toLowerCase().includes(needle));
-  }, [data?.today, query]);
+  }, [todayRows, query]);
 
   const unloggedRows = filteredRows.filter((row) => !isLogged(row));
   const doneRows = filteredRows.filter((row) => isLogged(row));
@@ -89,11 +100,19 @@ function TrackersPage() {
       return;
     }
 
+    // DEV_NOTE: the reorder endpoint takes every active tracker exactly once, and most of them may
+    // not be on screen today. The dragged rows are dealt back into the slots they already held in
+    // the full order, so a tracker not due today keeps its place instead of being dropped.
     const reordered = moveItem(unloggedRows, dragIndex, dropIndex);
-    reorderTrackers.mutate([
-      ...reordered.map((row) => row.tracker.publicId),
-      ...doneRows.map((row) => row.tracker.publicId),
-    ]);
+    const movedIds = new Set(unloggedRows.map((row) => row.tracker.publicId));
+    let next = 0;
+    reorderTrackers.mutate(
+      allRows.map((row) =>
+        movedIds.has(row.tracker.publicId)
+          ? reordered[next++].tracker.publicId
+          : row.tracker.publicId,
+      ),
+    );
     setDragIndex(null);
   }
 
@@ -164,9 +183,18 @@ function TrackersPage() {
       ) : (
         <div className="flex flex-col">
           {unloggedRows.length === 0 && doneRows.length === 0 ? (
-            <p className="px-6 py-10 text-center text-muted-foreground">
-              No trackers match "{query}".
-            </p>
+            isFiltering ? (
+              <p className="px-6 py-10 text-center text-muted-foreground">
+                No trackers match "{query}".
+              </p>
+            ) : (
+              <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+                <p className="text-muted-foreground">Nothing is asking for you today.</p>
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/trackers/all">See every tracker</Link>
+                </Button>
+              </div>
+            )
           ) : (
             unloggedRows.map((row, index) => (
               <div

@@ -52,6 +52,12 @@ function makeRequest(path: string, method = "GET", body?: unknown) {
 
 const today = new Date().toISOString().slice(0, 10);
 
+function addDaysTo(localDate: string, delta: number): string {
+  const date = new Date(`${localDate}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + delta);
+  return date.toISOString().slice(0, 10);
+}
+
 function dayBefore(n: number): string {
   const date = new Date(`${today}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() - n);
@@ -1117,6 +1123,98 @@ describe("Trackers — every_n_days schedule", () => {
     expect(byDate[dayBefore(2)]).toBe("no_data"); // 2 days since — on cadence
     expect(byDate[dayBefore(1)]).toBe("not_scheduled");
     expect(byDate[today]).toBe("no_data"); // 4 days since — on cadence
+  });
+});
+
+// DEV_NOTE: `today` on the list carries every non-archived tracker (the all-trackers table needs
+// them all); isDueToday is what the Today screen filters on. One tracker per schedule shape that can
+// come out false, plus a control that must come out true.
+describe("Trackers — isDueToday", () => {
+  const todayDow = new Date(`${today}T00:00:00.000Z`).getUTCDay();
+  const ids: Record<string, string> = {};
+
+  async function create(name: string, schedule: unknown, activeFrom: string) {
+    const tracker = await createTracker({
+      tracker: { name, manifest: { ...habitManifest(), schedule }, activeFrom },
+      metric: newMetricSpec(name),
+    });
+    ids[name] = tracker.publicId;
+  }
+
+  async function listToday() {
+    const res = await worker.fetch(
+      makeRequest("/trackers?withToday=true"),
+      testEnv,
+      createExecutionContext(),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      today: { tracker: { publicId: string }; isDueToday: boolean }[];
+      todayStats: { totalCount: number };
+    };
+    return body;
+  }
+
+  function dueOf(body: Awaited<ReturnType<typeof listToday>>, name: string) {
+    return body.today.find((row) => row.tracker.publicId === ids[name])?.isDueToday;
+  }
+
+  beforeAll(async () => {
+    await create("Due Daily", { type: "daily" }, dayBefore(10));
+    await create("Due Future Start", { type: "daily" }, addDaysTo(today, 7));
+    await create("Due Today Weekday", { type: "days_of_week", days: [todayDow] }, dayBefore(10));
+    await create(
+      "Due Other Weekday",
+      { type: "days_of_week", days: [(todayDow + 1) % 7] },
+      dayBefore(10),
+    );
+    // activeFrom is day 0 of the cadence — 1 day since is off a 2-day cadence, 2 days since is on.
+    await create("Due Off Cadence", { type: "every_n_days", intervalDays: 2 }, dayBefore(1));
+    await create("Due On Cadence", { type: "every_n_days", intervalDays: 2 }, dayBefore(2));
+    await create("Due Weekly Met", { type: "times_per_week", count: 1 }, dayBefore(10));
+    await create("Due Weekly Open", { type: "times_per_week", count: 1 }, dayBefore(10));
+
+    // A met day earlier this (Sunday-start) week satisfies a 1×/week tracker. On a Sunday there is
+    // no earlier day this week, so it stays due — asserted below.
+    if (todayDow > 0) {
+      await worker.fetch(
+        makeRequest(`/trackers/${ids["Due Weekly Met"]}/entries`, "POST", {
+          payload: { control: "toggle", date: dayBefore(todayDow), completed: true },
+        }),
+        testEnv,
+        createExecutionContext(),
+      );
+    }
+    // A met day last week counts for nothing this week.
+    await worker.fetch(
+      makeRequest(`/trackers/${ids["Due Weekly Open"]}/entries`, "POST", {
+        payload: { control: "toggle", date: dayBefore(todayDow + 1), completed: true },
+      }),
+      testEnv,
+      createExecutionContext(),
+    );
+  });
+
+  afterAll(async () => {
+    for (const publicId of Object.values(ids)) await archiveTracker(publicId);
+  });
+
+  it("returns every tracker, including one that hasn't started, and flags which are due", async () => {
+    const body = await listToday();
+
+    expect(dueOf(body, "Due Daily")).toBe(true);
+    expect(dueOf(body, "Due Future Start")).toBe(false);
+    expect(dueOf(body, "Due Today Weekday")).toBe(true);
+    expect(dueOf(body, "Due Other Weekday")).toBe(false);
+    expect(dueOf(body, "Due Off Cadence")).toBe(false);
+    expect(dueOf(body, "Due On Cadence")).toBe(true);
+    expect(dueOf(body, "Due Weekly Met")).toBe(todayDow === 0);
+    expect(dueOf(body, "Due Weekly Open")).toBe(true);
+  });
+
+  it("counts only due trackers in todayStats.totalCount", async () => {
+    const body = await listToday();
+    expect(body.todayStats.totalCount).toBe(body.today.filter((row) => row.isDueToday).length);
   });
 });
 

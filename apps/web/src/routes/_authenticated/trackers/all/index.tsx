@@ -16,13 +16,10 @@ import Utilities from "@/utils";
 import { TrackersQueries, useArchiveTracker } from "../-data";
 import { CONTROL_NAMES, DIRECTION_LABELS, describeSchedule, formatMetricValue } from "../-utils";
 
-// DEV_NOTE: Today (trackers/index.tsx) already renders every tracker — TrackersRepo.getTrackers
-// applies no schedule filter, so a Mon/Wed/Fri tracker gets a row on a Tuesday. What it does not do
-// is let you *see* them: a row there is a quick-add widget two lines tall, and the configuration
-// that decides what the widget does (schedule, target, direction, which metric it writes) is spread
-// across the row's sub-line or not shown at all. This screen is the other half — one line per
-// tracker, every field that was a decision when it was created, side by side down a column so
-// twelve trackers can be compared instead of read one at a time.
+// DEV_NOTE: Today (trackers/index.tsx) renders only the trackers due today (isDueToday), each as a
+// quick-add widget two lines tall. This screen is the other half — every non-archived tracker, due
+// or not, started or not, one line each, every field that was a decision when it was created, side
+// by side down a column so twelve trackers can be compared instead of read one at a time.
 //
 // DEV_NOTE: /trackers/all, not a top-level route — a static segment beats $trackerId in TanStack
 // Router's ranking, and it sits beside the existing trackers/new for the same reason.

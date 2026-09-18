@@ -84,6 +84,32 @@ export function dayState(
   return met ? "met" : "partial";
 }
 
+// DEV_NOTE: whether the Today screen should ask for this tracker on `localDate`. Same line as
+// isScheduled for every shape but "times_per_week": that one names a count, not days, so it is due
+// each day of the week (Sunday-start, matching dayOfWeek and the month calendar) until the week's
+// count of met days *before* localDate reaches it. A day logged today still leaves it due today —
+// what was asked of today doesn't change because it was answered.
+export function isDueOn(
+  localDate: string,
+  sums: Map<string, number>,
+  tracker: Pick<Schemas.Tracker, "activeFrom" | "manifest">,
+  targets: Schemas.TrackerTarget[],
+): boolean {
+  if (localDate < tracker.activeFrom) return false;
+
+  const schedule = tracker.manifest.schedule;
+  if (schedule.type !== "times_per_week") {
+    return isScheduled(localDate, schedule, tracker.activeFrom);
+  }
+
+  let metThisWeek = 0;
+  for (let delta = dayOfWeek(localDate); delta > 0; delta--) {
+    const date = addDays(localDate, -delta);
+    if (dayState(date, sums, tracker, resolveTargetAt(targets, date)) === "met") metThisWeek++;
+  }
+  return metThisWeek < schedule.count;
+}
+
 // DEV_NOTE: invariant 8 — streaks count through yesterday; today only extends the streak if already
 // met (an unmet today doesn't break it, since the day isn't over). Unscheduled days are skipped
 // rather than counted or broken on (architecture.md §6 "skip unscheduled days").

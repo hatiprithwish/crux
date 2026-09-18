@@ -294,6 +294,10 @@ export interface TrackerTodayApiShape {
   todaySum: number | null; // null = nothing logged today (invariant 7 — never coalesced to 0)
   todayCount: number;
   streak: number;
+  // DEV_NOTE: `today` carries every non-archived tracker (the all-trackers table needs each one's
+  // streak); this is what the Today screen filters on. False before activeFrom, on a day the
+  // schedule skips, and for a times_per_week tracker whose week is already met (Scoring.isDueOn).
+  isDueToday: boolean;
   openSession: TrackerEntryApiShape | null; // timer trackers only
   // DEV_NOTE: every live if-then plan, in the user's order — the capture sheet offers all of them
   // as one-tap triggers, off this same request.

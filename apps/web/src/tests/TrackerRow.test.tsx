@@ -80,6 +80,7 @@ function makeToday(
     todaySum: null,
     todayCount: 0,
     streak: 0,
+    isDueToday: true,
     openSession: null,
     plans: [],
     displayPlans: [],

@@ -6,7 +6,7 @@ import TrackersDAL from "@/data-access-layer/TrackersDAL";
 import { factValue } from "@/manifest/Aggregation";
 import { planQuickAdd, type PlannedEntry } from "@/manifest/ControlHandlers";
 import { getComputeModule, validateComputeManifest } from "@/manifest/ComputeRegistry";
-import { addDays, computeStreak, dayState, resolveTargetAt } from "@/manifest/Scoring";
+import { addDays, computeStreak, dayState, isDueOn, resolveTargetAt } from "@/manifest/Scoring";
 import Utility from "@/utils/Utility";
 import { utcDateString } from "@/utils/DateTime";
 import type * as Schemas from "@app/schemas";
@@ -615,7 +615,7 @@ export default class TrackersRepo {
     }
 
     const todayShapes: Schemas.TrackerTodayApiShape[] = [];
-    let activeCount = 0;
+    let dueCount = 0;
     let loggedCount = 0;
     let timeTodaySeconds: number | null = null;
     let spentTodayMinor: number | null = null;
@@ -624,15 +624,13 @@ export default class TrackersRepo {
     const sevenDayWindow = [0, 1, 2, 3, 4, 5, 6].map((delta) => addDays(today, -delta));
 
     for (const [index, tracker] of trackers.entries()) {
-      // DEV_NOTE: activeFrom in the future means the tracker hasn't started yet — Scoring.dayState
-      // already calls this "not_active" for history/heatmap; Today has to honour the same line or a
-      // tracker a user scheduled to start next week shows up asking to be logged today.
-      if (tracker.activeFrom > today) continue;
-      activeCount++;
-
+      // DEV_NOTE: every tracker gets a row — the all-trackers table reads its streak from here — but
+      // only a due one is asked for on Today or counted in its stat strip. A tracker starting next
+      // week, or a Mon/Wed/Fri one on a Tuesday, is isDueToday: false (Scoring.isDueOn).
       const sums = valuesByMetric.get(tracker.primaryMetricId) ?? new Map<string, number>();
       const todaySum = sums.has(today) ? (sums.get(today) as number) : null;
       const targets = targetsByTracker.get(tracker.id) ?? [];
+      const isDueToday = isDueOn(today, sums, tracker, targets);
 
       let openSession: Schemas.TrackerEntryApiShape | null = null;
       if (tracker.manifest.control === "timer") {
@@ -644,6 +642,7 @@ export default class TrackersRepo {
         todaySum,
         todayCount: todaySum === null ? 0 : 1,
         streak: computeStreak(sums, tracker, targets, today),
+        isDueToday,
         openSession,
         plans: plansByTracker.get(tracker.id) ?? [],
         displayPlans: this.selectDisplayPlans(plansByTracker.get(tracker.id) ?? []),
@@ -651,7 +650,10 @@ export default class TrackersRepo {
 
       // DEV_NOTE: design/today-web.png's stat strip — computed off the sums/targets already loaded
       // above for streaks, not a second range scan.
-      if (todaySum !== null || openSession !== null) loggedCount++;
+      if (isDueToday) {
+        dueCount++;
+        if (todaySum !== null || openSession !== null) loggedCount++;
+      }
 
       const semanticType = shapes[index].metricDetails[0]?.semanticType;
       if (todaySum !== null && semanticType === "duration_seconds") {
@@ -671,7 +673,7 @@ export default class TrackersRepo {
 
     const todayStats: Schemas.TrackerTodayStatsApiShape = {
       loggedCount,
-      totalCount: activeCount,
+      totalCount: dueCount,
       timeTodaySeconds,
       spentTodayMinor,
       sevenDayRatePercent:

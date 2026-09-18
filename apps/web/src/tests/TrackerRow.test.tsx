@@ -126,12 +126,12 @@ describe("TrackerRow", () => {
   // any of these widgets appear, and getting it wrong is what a per-domain frontend used to prevent.
   it("renders the toggle control for a toggle manifest", () => {
     render(<TrackerRow today={makeToday(makeTracker("toggle"))} />);
-    expect(screen.getByRole("button", { name: /mark done/i })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /mark done/i })).toBeInTheDocument();
   });
 
   it("shows 'Done today' when the day is already logged", () => {
     render(<TrackerRow today={makeToday(makeTracker("toggle"), { todaySum: 1, todayCount: 1 })} />);
-    expect(screen.getByRole("button", { name: /done today/i })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /done today/i })).toBeInTheDocument();
   });
 
   it("renders the stepper control with its step size", () => {

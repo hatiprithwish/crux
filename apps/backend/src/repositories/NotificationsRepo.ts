@@ -225,7 +225,7 @@ export default class NotificationsRepo {
     }
 
     const payload: Schemas.PushPayload = {
-      title: "Substrate",
+      title: "Neuron",
       body: "Test notification — push is wired up correctly.",
       url: "/trackers",
       tag: "test",
@@ -356,7 +356,7 @@ export default class NotificationsRepo {
       if (!subscriptionsResult.isSuccess || !subscriptionsResult.subscriptions?.length) return;
 
       const payload: Schemas.PushPayload = {
-        title: "Substrate",
+        title: "Neuron",
         body: `Don't forget: ${target.trackerName}`,
         url: `/trackers/${target.trackerPublicId}`,
         tag: "tracker_reminder",
@@ -503,7 +503,7 @@ export default class NotificationsRepo {
           ? [...open.slice(0, MAX_DIGEST_NAMES), `+${open.length - MAX_DIGEST_NAMES} more`]
           : open;
       const payload: Schemas.PushPayload = {
-        title: "Substrate",
+        title: "Neuron",
         body: `${open.length} tracker${open.length === 1 ? "" : "s"} still open today — ${listed.join(", ")}.`,
         url: "/trackers",
         tag: "streak_digest",
@@ -584,7 +584,7 @@ export default class NotificationsRepo {
         if (!subscriptionsResult.isSuccess || !subscriptionsResult.subscriptions?.length) return;
 
         const payload: Schemas.PushPayload = {
-          title: "Substrate",
+          title: "Neuron",
           body: `Timer still running: ${entry.trackerName}, ${this.formatDuration(minutesOpen)}.`,
           url: `/trackers/${entry.trackerPublicId}`,
           tag: "open_interval",

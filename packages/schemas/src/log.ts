@@ -19,7 +19,7 @@ export enum LogAction {
   GetUserDetails = "GetUserDetails",
   UpdateUserDetails = "UpdateUserDetails",
 
-  // Substrate — entities
+  // Neuron — entities
   CreateEntity = "CreateEntity",
   GetEntityDetails = "GetEntityDetails",
   GetEntities = "GetEntities",
@@ -30,7 +30,7 @@ export enum LogAction {
   GetEntityStats = "GetEntityStats",
   DeleteEntity = "DeleteEntity",
 
-  // Substrate — metrics
+  // Neuron — metrics
   CreateMetric = "CreateMetric",
   GetMetricDetails = "GetMetricDetails",
   GetMetrics = "GetMetrics",
@@ -38,7 +38,7 @@ export enum LogAction {
   UpdateMetric = "UpdateMetric",
   DeleteMetric = "DeleteMetric",
 
-  // Substrate — trackers
+  // Neuron — trackers
   CreateTracker = "CreateTracker",
   GetTrackerDetails = "GetTrackerDetails",
   GetTrackers = "GetTrackers",
@@ -48,12 +48,12 @@ export enum LogAction {
   DeleteTracker = "DeleteTracker",
   ReorderTrackers = "ReorderTrackers",
 
-  // Substrate — tracker target history (a target is a value *from a date*, not one number)
+  // Neuron — tracker target history (a target is a value *from a date*, not one number)
   CreateTrackerTarget = "CreateTrackerTarget",
   GetTrackerTargets = "GetTrackerTargets",
   DeleteTrackerTarget = "DeleteTrackerTarget",
 
-  // Substrate — tracker plans (if-then triggers) and moments (a trigger firing)
+  // Neuron — tracker plans (if-then triggers) and moments (a trigger firing)
   CreateTrackerPlan = "CreateTrackerPlan",
   GetTrackerPlans = "GetTrackerPlans",
   UpdateTrackerPlan = "UpdateTrackerPlan",
@@ -63,7 +63,7 @@ export enum LogAction {
   GetTrackerMoments = "GetTrackerMoments",
   DeleteTrackerMoment = "DeleteTrackerMoment",
 
-  // Substrate — entries
+  // Neuron — entries
   WriteEntry = "WriteEntry",
   GetEntries = "GetEntries",
   GetEntriesWithParts = "GetEntriesWithParts",

@@ -3,7 +3,7 @@
 // -PushEnableCard.tsx; this file only wraps individual browser APIs so that component isn't reading
 // raw `navigator.serviceWorker`/`PushManager` calls directly.
 
-const SUBSCRIPTION_PUBLIC_ID_KEY = "substrate:pushSubscriptionPublicId";
+const SUBSCRIPTION_PUBLIC_ID_KEY = "neuron:pushSubscriptionPublicId";
 
 export function isPushSupported(): boolean {
   return (

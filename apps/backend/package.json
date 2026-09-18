@@ -9,7 +9,7 @@
     "deploy:production": "wrangler deploy --env production",
     "typecheck": "tsc --noEmit",
     "generate-types": "wrangler types",
-    "db:generate": "drizzle-kit generate --name crux",
+    "db:generate": "drizzle-kit generate --name neuron",
     "db:migrate:staging": "wrangler d1 migrations apply crux-db --remote --env staging",
     "db:migrate:production": "wrangler d1 migrations apply crux-db --remote --env production",
     "db:migrate": "pnpm db:migrate:production",

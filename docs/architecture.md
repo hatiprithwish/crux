@@ -1,14 +1,14 @@
-# Substrate — data model and approach (v2)
+# Neuron — data model and approach (v2)
 
 Consolidated from the full design discussion. Supersedes the earlier single-metric,
 single-entity sketch. Target: Cloudflare D1 (SQLite) + Drizzle ORM.
 
 ---
 
-## 0. Why Substrate exists
+## 0. Why Neuron exists
 
-Substrate is a life companion for people who want to live intentionally and build a life
-they absolutely love. The user is the main character of their own life, and Substrate is
+Neuron is a life companion for people who want to live intentionally and build a life
+they absolutely love. The user is the main character of their own life, and Neuron is
 where they see, track and improve every part of it. It aims to be the most important
 companion they have, and ideally the only one they need. This is the core of the app,
 and every section below serves it. Whatever solving that problem takes, we build, even

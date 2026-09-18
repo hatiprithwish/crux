@@ -96,7 +96,7 @@ export function AppSidebar() {
     // footer is always reachable and the nav takes its own scrollbar if the list ever outgrows it.
     <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
       <div className="shrink-0 px-5 pt-6 pb-4">
-        <p className="font-heading text-xl font-bold text-sidebar-foreground">Substrate</p>
+        <p className="font-heading text-xl font-bold text-sidebar-foreground">Neuron</p>
         {dayNumber !== null && (
           <p className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
             Day {dayNumber}

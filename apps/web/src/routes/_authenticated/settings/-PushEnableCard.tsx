@@ -162,7 +162,7 @@ export function PushEnableCard() {
           <ol className="list-decimal space-y-1 pl-4 text-sm text-muted-foreground">
             <li>Tap the Share button in Safari's toolbar.</li>
             <li>Choose "Add to Home Screen".</li>
-            <li>Open Substrate from the Home Screen icon, then come back to this page.</li>
+            <li>Open Neuron from the Home Screen icon, then come back to this page.</li>
           </ol>
         </CardContent>
       </Card>

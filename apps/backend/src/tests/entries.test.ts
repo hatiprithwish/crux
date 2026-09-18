@@ -46,7 +46,7 @@ async function getDailyFact(metricId: number, entityId: number | null, localDate
 // scopes each run's fixtures to itself, the same way time.test.ts scopes its session labels.
 const runSuffix = Math.random().toString(36).slice(2, 8);
 
-describe("Substrate: entries + entry_values -> daily_facts", () => {
+describe("Neuron: entries + entry_values -> daily_facts", () => {
   const entitiesDAL = new EntitiesDAL(env);
   const metricsDAL = new MetricsDAL(env);
   const trackersDAL = new TrackersDAL(env);
@@ -62,8 +62,8 @@ describe("Substrate: entries + entry_values -> daily_facts", () => {
   beforeAll(async () => {
     const metric = await metricsDAL.createMetric({
       userId,
-      key: `substrate_test_metric_${runSuffix}`,
-      name: `Substrate Test Metric ${runSuffix}`,
+      key: `neuron_test_metric_${runSuffix}`,
+      name: `Neuron Test Metric ${runSuffix}`,
       semanticType: "count",
       canonicalUnit: "count",
       defaultAgg: "sum",
@@ -78,7 +78,7 @@ describe("Substrate: entries + entry_values -> daily_facts", () => {
     const tracker = await trackersDAL.createTracker({
       userId,
       primaryMetricId: metricId,
-      name: `Substrate Test Tracker ${runSuffix}`,
+      name: `Neuron Test Tracker ${runSuffix}`,
       manifest: {
         control: "increment",
         metrics: [metric.metric.key],
@@ -100,7 +100,7 @@ describe("Substrate: entries + entry_values -> daily_facts", () => {
     const entity = await entitiesDAL.createEntity({
       userId,
       kind: "project",
-      name: `Substrate Test Project ${runSuffix}`,
+      name: `Neuron Test Project ${runSuffix}`,
     });
     if (!entity.isSuccess || !entity.entity) {
       throw new Error("Failed to create test entity");

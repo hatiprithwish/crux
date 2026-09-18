@@ -46,7 +46,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Substrate" },
+      { title: "Neuron" },
       { name: "description", content: "The ground you build an intentional life on." },
       // DEV_NOTE: iOS makes the manifest (and this) mandatory, not optional — Safari only offers
       // "Add to Home Screen" as an installable app when a manifest with display: "standalone" is

@@ -28,7 +28,7 @@ export function createRouter() {
       integrations: [
         Sentry.tanstackRouterBrowserTracingIntegration(router),
         Sentry.replayIntegration(),
-        Sentry.feedbackIntegration({ colorScheme: "system" }),
+        Sentry.feedbackIntegration({ colorScheme: "system", triggerLabel: "" }),
       ],
       enableLogs: true,
       tracesSampleRate: 1.0,

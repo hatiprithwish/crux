@@ -156,3 +156,10 @@ body {
     margin: 0;
   }
 }
+
+/* Sentry's feedback button lives in a shadow root — only its --font-size custom property
+   (which sizes the icon in em) is reachable from outside. Its 16px padding is hardcoded, not
+   a var, so this shrinks the icon but not the button's overall footprint. */
+#sentry-feedback {
+  --font-size: 10px;
+}

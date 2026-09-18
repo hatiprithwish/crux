@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "@/shadcn/ui/button";
+import { Checkbox } from "@/shadcn/ui/checkbox";
 import type * as Schemas from "@app/schemas";
 import type { ControlProps } from "./-TrackerRow";
 import { EntityLinkFields } from "./-EntityLinkFields";
@@ -21,12 +21,11 @@ export function ToggleControl({
 
   return (
     <div className="flex flex-col gap-3">
-      <Button
-        variant={done ? "default" : "outline"}
-        size="sm"
-        className="self-start"
+      <Checkbox
+        checked={done}
         disabled={isPending}
-        onClick={() =>
+        className="size-6 self-start rounded-md"
+        onCheckedChange={() =>
           onQuickAdd({
             control: "toggle",
             date: localDate,
@@ -37,9 +36,7 @@ export function ToggleControl({
         aria-label={
           done ? `${tracker.name}: done ${dayPhrase}` : `${tracker.name}: mark done ${dayPhrase}`
         }
-      >
-        {done ? `Done ${dayPhrase}` : `Mark done ${dayPhrase}`}
-      </Button>
+      />
 
       {/* DEV_NOTE: renders nothing until the user actually has entities, so a plain habit stays a
           single button — but attributing one to a project or goal is what feeds the entity rollup

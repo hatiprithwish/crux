@@ -30,12 +30,12 @@ import {
 // log) are exactly the kind that get better with the space. Sections are separated by full-width
 // rules with px-6 py-5 cells inside them, which is the form's rhythm, so the two screens read as
 // one app rather than two.
-const DETAIL_TABS = ["triggers", "history", "targets"] as const;
+const DETAIL_TABS = ["history", "targets", "triggers"] as const;
 
 // DEV_NOTE: the tab lives in the URL so a refresh, a back button or a shared link lands on the same
-// tab. Absent means Triggers — the if-then plan is the thing this page most wants the user to see
-// every time they open a tracker, so it opens there instead of behind a click. Anything
-// unrecognised in the URL is dropped rather than rejected.
+// tab. Absent means History — the heatmap and streak are what the user most wants to see on
+// opening a tracker, so it opens there instead of behind a click. Anything unrecognised in the URL
+// is dropped rather than rejected.
 export const Route = createFileRoute("/_authenticated/trackers/$trackerId/")({
   validateSearch: (search: Record<string, unknown>): { tab?: (typeof DETAIL_TABS)[number] } => ({
     tab: DETAIL_TABS.find((tab) => tab === search.tab),
@@ -71,7 +71,7 @@ function SectionHeading({ title, meta }: { title: string; meta?: string }) {
 
 function TrackerDetailPage() {
   const { trackerId } = Route.useParams();
-  const { tab = "triggers" } = Route.useSearch();
+  const { tab = "history" } = Route.useSearch();
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const runCompute = useRunCompute();
@@ -223,9 +223,9 @@ function TrackerDetailPage() {
       >
         <div className="overflow-x-auto border-b border-border px-6">
           <TabsList variant="line" className="h-14!">
-            <TabsTrigger value="triggers">Triggers &amp; Preventions</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="targets">Targets</TabsTrigger>
+            <TabsTrigger value="triggers">Triggers &amp; Preventions</TabsTrigger>
           </TabsList>
         </div>
 

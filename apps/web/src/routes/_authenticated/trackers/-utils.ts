@@ -86,6 +86,21 @@ export function supportsDisplayUnit(semanticType: Schemas.SemanticType): boolean
   return semanticType === "duration_seconds";
 }
 
+// DEV_NOTE: dayState (Scoring.ts) only reads target/direction when target is non-null, and a
+// boolean's sum is always exactly 1 on a logged day — never partway — so any target a boolean could
+// reach is identical to "logged at all", and direction flips nothing once target is null. Target,
+// direction and step are therefore inert on a toggle tracker; whether a day counts is decided by
+// schedule alone. Disabling them here keeps that invariant visible instead of discoverable by a
+// target nobody could ever miss.
+export function supportsTarget(semanticType: Schemas.SemanticType): boolean {
+  return semanticType !== "boolean";
+}
+
+export const BOOLEAN_TARGET_HELP =
+  "A toggle either happened or didn't — its number is always 1 when logged, never partway. " +
+  "Target, direction and step exist to grade a partial day, which a boolean can't have. Whether " +
+  "today counts is decided by Schedule above, not by these three.";
+
 // DEV_NOTE: null means "this metric has no unit but its canonical one" — every caller reads that as
 // "no conversion, no suffix", which is exactly how every control behaved before this existed.
 export function resolveDisplayUnit(

@@ -4,7 +4,7 @@ export type CreateTrackerPlanDALRequest = TrackerPlanBase &
   Pick<TrackerPlan, "userId" | "trackerId">;
 
 export type UpdateTrackerPlanDALRequest = Pick<TrackerPlan, "userId" | "trackerId" | "publicId"> & {
-  fields: Partial<TrackerPlanBase>;
+  fields: Partial<TrackerPlanBase & Pick<TrackerPlan, "isPriority">>;
 };
 
 export type FindTrackerPlanDALRequest = Pick<TrackerPlan, "userId" | "trackerId" | "publicId">;

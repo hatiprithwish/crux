@@ -82,6 +82,7 @@ function makeToday(
     streak: 0,
     openSession: null,
     plans: [],
+    displayPlans: [],
     ...overrides,
   };
 }
@@ -109,11 +110,16 @@ describe("TrackerRow", () => {
       publicId: "tpl_1",
       cue: "Phone in bed",
       response: "Charge it across the room",
+      isPriority: false,
       sortOrder: 0,
       createdAt: new Date(),
       updatedAt: null,
     };
-    render(<TrackerRow today={makeToday(makeTracker("toggle"), { plans: [plan] })} />);
+    render(
+      <TrackerRow
+        today={makeToday(makeTracker("toggle"), { plans: [plan], displayPlans: [plan] })}
+      />,
+    );
     expect(screen.getByText(/phone in bed/i)).toBeInTheDocument();
     expect(screen.getByText(/charge it across the room/i)).toBeInTheDocument();
     expect(screen.queryByText(/every day/i)).not.toBeInTheDocument();

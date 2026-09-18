@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { ArrowUp, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
+import { ArrowUp, PencilSimple, Plus, Star, Trash } from "@phosphor-icons/react";
 import * as Schemas from "@app/schemas";
 import { Button } from "@/shadcn/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip";
 import { cn } from "@/utils/tailwind";
 import {
   useCreateTrackerPlan,
@@ -97,6 +98,14 @@ export function TrackerTriggersTab({
     });
   }
 
+  function togglePriority(plan: Schemas.TrackerPlanApiShape) {
+    updatePlan.mutate({
+      publicId: tracker.publicId,
+      planPublicId: plan.publicId,
+      plan: { isPriority: !plan.isPriority },
+    });
+  }
+
   function renderTally(tally: TriggerTally | undefined) {
     if (!tally) return <span className="text-muted-foreground">No moments</span>;
     return (
@@ -180,6 +189,27 @@ export function TrackerTriggersTab({
                               <ArrowUp />
                             </Button>
                           ) : null}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={
+                                  plan.isPriority
+                                    ? `Remove "${plan.cue}" from Today`
+                                    : `Show "${plan.cue}" on Today`
+                                }
+                                disabled={updatePlan.isPending}
+                                onClick={() => togglePriority(plan)}
+                              >
+                                <Star
+                                  weight={plan.isPriority ? "fill" : "regular"}
+                                  className={plan.isPriority ? "text-primary" : undefined}
+                                />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Starred plans show on the Today screen</TooltipContent>
+                          </Tooltip>
                           <Button
                             variant="ghost"
                             size="icon-sm"

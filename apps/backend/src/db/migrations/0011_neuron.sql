@@ -1,0 +1,1 @@
+ALTER TABLE `tracker_plans` ADD `is_priority` integer DEFAULT false NOT NULL;

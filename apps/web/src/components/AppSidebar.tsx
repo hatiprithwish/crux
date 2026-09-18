@@ -5,26 +5,6 @@ import { useQuery } from "@tanstack/react-query";
 import { UsersQueries } from "@/providers/UsersQueries";
 import { cn } from "@/utils/tailwind";
 
-// DEV_NOTE: replaces the old top AppNav — design/today-web.png's whole premise is "the margin
-// becomes the sidebar", so the shell and the Today screen shipped as one change (redesign-backlog.md
-// notes what didn't). Renders the same nav data twice (a vertical list here, a bottom tab bar for
-// small screens) rather than one component two ways, since the two layouts share no markup once the
-// header and footer are in the mix.
-//
-// DEV_NOTE: the rail used to carry a per-tracker list with today's value beside each name. It was a
-// second copy of the Today screen living one pane to its left — the same rows, the same numbers,
-// kept in sync by a second `TrackersQueries.list` subscription. Navigation lost nothing when it
-// went: TrackerRow already links each tracker to its detail page. What the sidebar is now is four
-// destinations and a footer, which is all a shell owes the screens inside it.
-//
-// DEV_NOTE: `isActive` is a predicate per entry rather than a `Link` activeOptions flag because two
-// of these destinations share a path prefix — /trackers is Today, /trackers/all is the management
-// list, and prefix matching lights both. Today is therefore the one exact match in the list, while
-// Trackers claims every other /trackers/* route: a tracker's detail and edit screens are places you
-// arrive at from the management list, not places the day's log lives.
-//
-// DEV_NOTE: one predicate serves both navs. The bottom bar used to carry its own ternary special-
-// casing /trackers, which is exactly the kind of drift that puts two navs on different answers.
 interface NavItem {
   to: "/trackers" | "/trackers/all" | "/metrics" | "/entities";
   label: string;

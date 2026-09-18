@@ -78,6 +78,13 @@ export default class TrackersRepo {
     return rest;
   }
 
+  // DEV_NOTE: user-flagged plans are what the Today row surfaces, and there can be more than one.
+  // None flagged means the row shows no plan — the user chose not to star anything, not "show me
+  // something anyway".
+  private selectDisplayPlans(plans: Schemas.TrackerPlanApiShape[]): Schemas.TrackerPlanApiShape[] {
+    return plans.filter((plan) => plan.isPriority);
+  }
+
   // --- shared lookups --------------------------------------------------------------------------
 
   private async loadMetrics(userId: string): Promise<MetricLookup | null> {
@@ -608,6 +615,7 @@ export default class TrackersRepo {
     }
 
     const todayShapes: Schemas.TrackerTodayApiShape[] = [];
+    let activeCount = 0;
     let loggedCount = 0;
     let timeTodaySeconds: number | null = null;
     let spentTodayMinor: number | null = null;
@@ -616,6 +624,12 @@ export default class TrackersRepo {
     const sevenDayWindow = [0, 1, 2, 3, 4, 5, 6].map((delta) => addDays(today, -delta));
 
     for (const [index, tracker] of trackers.entries()) {
+      // DEV_NOTE: activeFrom in the future means the tracker hasn't started yet — Scoring.dayState
+      // already calls this "not_active" for history/heatmap; Today has to honour the same line or a
+      // tracker a user scheduled to start next week shows up asking to be logged today.
+      if (tracker.activeFrom > today) continue;
+      activeCount++;
+
       const sums = valuesByMetric.get(tracker.primaryMetricId) ?? new Map<string, number>();
       const todaySum = sums.has(today) ? (sums.get(today) as number) : null;
       const targets = targetsByTracker.get(tracker.id) ?? [];
@@ -632,6 +646,7 @@ export default class TrackersRepo {
         streak: computeStreak(sums, tracker, targets, today),
         openSession,
         plans: plansByTracker.get(tracker.id) ?? [],
+        displayPlans: this.selectDisplayPlans(plansByTracker.get(tracker.id) ?? []),
       });
 
       // DEV_NOTE: design/today-web.png's stat strip — computed off the sums/targets already loaded
@@ -656,7 +671,7 @@ export default class TrackersRepo {
 
     const todayStats: Schemas.TrackerTodayStatsApiShape = {
       loggedCount,
-      totalCount: trackers.length,
+      totalCount: activeCount,
       timeTodaySeconds,
       spentTodayMinor,
       sevenDayRatePercent:

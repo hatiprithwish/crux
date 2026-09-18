@@ -26,6 +26,7 @@ import {
   AGG_HELP,
   AGG_HINTS,
   AGG_LABELS,
+  BOOLEAN_TARGET_HELP,
   CONTROL_TILES,
   DISPLAY_UNIT_LABELS,
   DIRECTION_HELP,
@@ -39,6 +40,7 @@ import {
   getTodayLocalDate,
   slugifyMetricKey,
   supportsDisplayUnit,
+  supportsTarget,
   toCanonical,
   toDisplay,
 } from "./-utils";
@@ -734,6 +736,7 @@ export function TrackerForm({
                   onValueChange={(value) =>
                     field.handleChange(value === "none" ? null : Number(value))
                   }
+                  modal={false}
                 >
                   <SelectTrigger id={field.name} className={UNDERLINE_TRIGGER}>
                     <SelectValue />
@@ -766,13 +769,21 @@ export function TrackerForm({
                 CONTROL_TILES.find((option) => option.key === values.tileKey) ?? CONTROL_TILES[0];
               const { metric } = resolveMetric(values, tile.control, metrics);
               const hasDisplayUnit = supportsDisplayUnit(metric.semanticType);
+              const targetDisabled = !supportsTarget(metric.semanticType);
 
               return (
                 <div className="flex flex-col gap-2 px-6 py-5 sm:border-r sm:border-border">
                   <form.Field name="target">
                     {(field) => (
                       <>
-                        <FieldLabelText htmlFor={field.name}>Target</FieldLabelText>
+                        <div className="flex items-center gap-1.5">
+                          <FieldLabelText htmlFor={field.name}>Target</FieldLabelText>
+                          {targetDisabled ? (
+                            <InfoHint label="Why target is disabled">
+                              {BOOLEAN_TARGET_HELP}
+                            </InfoHint>
+                          ) : null}
+                        </div>
                         <div className="flex items-end gap-2">
                           <Input
                             id={field.name}
@@ -782,6 +793,7 @@ export function TrackerForm({
                             value={field.state.value}
                             onChange={(event) => field.handleChange(event.target.value)}
                             onBlur={field.handleBlur}
+                            disabled={targetDisabled}
                             className={cn(UNDERLINE_INPUT, hasDisplayUnit && "min-w-0 flex-1")}
                           />
                           {hasDisplayUnit ? (
@@ -792,6 +804,7 @@ export function TrackerForm({
                                   onValueChange={(value) =>
                                     unitField.handleChange(value as Schemas.DisplayUnit)
                                   }
+                                  modal={false}
                                 >
                                   <SelectTrigger
                                     aria-label="Unit the target and every entry are typed in"
@@ -875,71 +888,101 @@ export function TrackerForm({
 
           {/* DEV_NOTE: next to Target on purpose — the two are one question ("is this number a
               floor or a ceiling?"), and the backend scores a day by reading them together. */}
-          <form.Field name="direction">
-            {(field) => (
-              <div className="flex flex-col gap-2 px-6 py-5 lg:border-r lg:border-border">
-                <div className="flex items-center gap-1.5">
-                  <FieldLabelText htmlFor={field.name}>Direction</FieldLabelText>
-                  <InfoHint label="Why direction is set per tracker">{DIRECTION_HELP}</InfoHint>
-                </div>
-                <Select
-                  value={field.state.value}
-                  onValueChange={(value) => field.handleChange(value as Schemas.Direction)}
-                >
-                  <SelectTrigger id={field.name} className={UNDERLINE_TRIGGER}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {Schemas.ZDirection.options.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {DIRECTION_LABELS[option]}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <span className="text-xs text-muted-foreground">
-                  {DIRECTION_HINTS[field.state.value]}
-                </span>
-              </div>
-            )}
-          </form.Field>
+          <form.Subscribe selector={(state) => state.values}>
+            {(values) => {
+              const tile =
+                CONTROL_TILES.find((option) => option.key === values.tileKey) ?? CONTROL_TILES[0];
+              const { metric } = resolveMetric(values, tile.control, metrics);
+              const targetDisabled = !supportsTarget(metric.semanticType);
 
-          <form.Field name="step">
-            {(field) => (
-              <div className="flex flex-col gap-2 px-6 py-5 sm:border-r sm:border-border">
-                <FieldLabelText htmlFor={field.name}>Step</FieldLabelText>
-                <Input
-                  id={field.name}
-                  type="number"
-                  step="any"
-                  placeholder="Not set"
-                  value={field.state.value}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  onBlur={field.handleBlur}
-                  className={UNDERLINE_INPUT}
-                />
-                {/* DEV_NOTE: step is typed in the same unit as the target — it's the amount one tap
-                    moves, and a stepper whose target is in minutes while its step is in seconds
-                    would move by a 60th of what the number says. */}
-                <form.Subscribe selector={(state) => state.values}>
-                  {(values) => {
-                    const tile =
-                      CONTROL_TILES.find((option) => option.key === values.tileKey) ??
-                      CONTROL_TILES[0];
-                    const { metric } = resolveMetric(values, tile.control, metrics);
-                    return supportsDisplayUnit(metric.semanticType) ? (
+              return (
+                <form.Field name="direction">
+                  {(field) => (
+                    <div className="flex flex-col gap-2 px-6 py-5 lg:border-r lg:border-border">
+                      <div className="flex items-center gap-1.5">
+                        <FieldLabelText htmlFor={field.name}>Direction</FieldLabelText>
+                        <InfoHint
+                          label={
+                            targetDisabled
+                              ? "Why direction is disabled"
+                              : "Why direction is set per tracker"
+                          }
+                        >
+                          {targetDisabled ? BOOLEAN_TARGET_HELP : DIRECTION_HELP}
+                        </InfoHint>
+                      </div>
+                      <Select
+                        value={field.state.value}
+                        onValueChange={(value) => field.handleChange(value as Schemas.Direction)}
+                        disabled={targetDisabled}
+                        modal={false}
+                      >
+                        <SelectTrigger id={field.name} className={UNDERLINE_TRIGGER}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {Schemas.ZDirection.options.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {DIRECTION_LABELS[option]}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
                       <span className="text-xs text-muted-foreground">
-                        In {DISPLAY_UNIT_LABELS[values.displayUnit]}, same as the target.
+                        {DIRECTION_HINTS[field.state.value]}
                       </span>
-                    ) : null;
-                  }}
-                </form.Subscribe>
-                <FieldError errors={field.state.meta.errors} />
-              </div>
-            )}
-          </form.Field>
+                    </div>
+                  )}
+                </form.Field>
+              );
+            }}
+          </form.Subscribe>
+
+          <form.Subscribe selector={(state) => state.values}>
+            {(values) => {
+              const tile =
+                CONTROL_TILES.find((option) => option.key === values.tileKey) ?? CONTROL_TILES[0];
+              const { metric } = resolveMetric(values, tile.control, metrics);
+              const targetDisabled = !supportsTarget(metric.semanticType);
+
+              return (
+                <form.Field name="step">
+                  {(field) => (
+                    <div className="flex flex-col gap-2 px-6 py-5 sm:border-r sm:border-border">
+                      <div className="flex items-center gap-1.5">
+                        <FieldLabelText htmlFor={field.name}>Step</FieldLabelText>
+                        {targetDisabled ? (
+                          <InfoHint label="Why step is disabled">{BOOLEAN_TARGET_HELP}</InfoHint>
+                        ) : null}
+                      </div>
+                      <Input
+                        id={field.name}
+                        type="number"
+                        step="any"
+                        placeholder="Not set"
+                        value={field.state.value}
+                        onChange={(event) => field.handleChange(event.target.value)}
+                        onBlur={field.handleBlur}
+                        disabled={targetDisabled}
+                        className={UNDERLINE_INPUT}
+                      />
+                      {/* DEV_NOTE: step is typed in the same unit as the target — it's the amount one
+                          tap moves, and a stepper whose target is in minutes while its step is in
+                          seconds would move by a 60th of what the number says. */}
+                      {supportsDisplayUnit(metric.semanticType) ? (
+                        <span className="text-xs text-muted-foreground">
+                          In {DISPLAY_UNIT_LABELS[values.displayUnit]}, same as the target.
+                        </span>
+                      ) : null}
+                      <FieldError errors={field.state.meta.errors} />
+                    </div>
+                  )}
+                </form.Field>
+              );
+            }}
+          </form.Subscribe>
 
           <form.Field name="entryMode">
             {(field) => (
@@ -948,6 +991,7 @@ export function TrackerForm({
                 <Select
                   value={field.state.value}
                   onValueChange={(value) => field.handleChange(value as "live" | "retro")}
+                  modal={false}
                 >
                   <SelectTrigger id={field.name} className={UNDERLINE_TRIGGER}>
                     <SelectValue />
@@ -1049,6 +1093,7 @@ export function TrackerForm({
                                 <Select
                                   value={field.state.value}
                                   onValueChange={applyExistingMetric}
+                                  modal={false}
                                 >
                                   <SelectTrigger
                                     id={field.name}
@@ -1124,6 +1169,7 @@ export function TrackerForm({
                                 onValueChange={(value) =>
                                   applySemanticType(value as Schemas.SemanticType)
                                 }
+                                modal={false}
                               >
                                 <SelectTrigger id={field.name} className="w-full">
                                   <SelectValue />
@@ -1181,6 +1227,7 @@ export function TrackerForm({
                                 onValueChange={(value) =>
                                   field.handleChange(value as Schemas.DefaultAgg)
                                 }
+                                modal={false}
                               >
                                 <SelectTrigger id={field.name} className="w-full">
                                   <SelectValue />

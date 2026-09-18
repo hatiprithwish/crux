@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ZTrackerMomentOutcome, ZTrackerPlanBase } from "./TrackerPlansCommon";
+import { ZTrackerMomentOutcome, ZTrackerPlan, ZTrackerPlanBase } from "./TrackerPlansCommon";
 
 export const ZCreateTrackerPlanApiRequest = z.object({
   plan: ZTrackerPlanBase,
@@ -7,7 +7,8 @@ export const ZCreateTrackerPlanApiRequest = z.object({
 export type CreateTrackerPlanApiRequest = z.infer<typeof ZCreateTrackerPlanApiRequest>;
 
 export const ZUpdateTrackerPlanApiRequest = z.object({
-  plan: ZTrackerPlanBase.partial()
+  plan: ZTrackerPlanBase.extend({ isPriority: ZTrackerPlan.shape.isPriority })
+    .partial()
     .strict()
     .refine((plan) => Object.keys(plan).length > 0, {
       message: "Provide at least one field to update",
@@ -16,7 +17,7 @@ export const ZUpdateTrackerPlanApiRequest = z.object({
 export type UpdateTrackerPlanApiRequest = z.infer<typeof ZUpdateTrackerPlanApiRequest>;
 
 // DEV_NOTE: the whole order, same contract as ZReorderTrackersApiRequest — every live plan of the
-// tracker must be present. The first one is what the Today row surfaces.
+// tracker must be present.
 export const ZReorderTrackerPlansApiRequest = z.object({
   planPublicIds: z.array(z.string()).min(1),
 });

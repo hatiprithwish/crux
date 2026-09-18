@@ -444,8 +444,8 @@ export function useReorderTrackers() {
 // tracker that happened to declare it.
 
 // DEV_NOTE: every plan write answers with the tracker's whole ordered list, so the plans cache is
-// written from the response. Only the list reads are invalidated on top (the Today row shows the
-// first plan) — keys.all() would also refetch a year of heatmap for a text edit.
+// written from the response. Only the list reads are invalidated on top (the Today row reads
+// isPriority off that list) — keys.all() would also refetch a year of heatmap for a text edit.
 function usePlansCacheSync() {
   const queryClient = useQueryClient();
 

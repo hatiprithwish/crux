@@ -23,6 +23,10 @@ export const ZTrackerPlan = ZTrackerPlanBase.extend({
   publicId: z.string(),
   userId: z.string(),
   trackerId: z.number(),
+  // DEV_NOTE: user-chosen, not derived — which live plans surface on the Today row. Multiple plans
+  // per tracker can be priority at once; none marked falls back to the first by sortOrder. Set to
+  // false at creation and toggled afterward (see ZUpdateTrackerPlanApiRequest), not a form field.
+  isPriority: z.boolean(),
   sortOrder: z.number(),
   createdAt: z.date(),
   updatedAt: z.date().nullable().optional(),

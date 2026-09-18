@@ -50,7 +50,6 @@ export default function TrackerRow({ today }: TrackerRowProps) {
   };
 
   const isRunning = tracker.manifest.control === "timer" && today.openSession !== null;
-  const topPlan = today.plans[0] ?? null;
 
   return (
     <div
@@ -84,21 +83,27 @@ export default function TrackerRow({ today }: TrackerRowProps) {
               {tracker.name}
             </Link>
           </span>
-          {/* DEV_NOTE: the first if-then plan takes the schedule's place — seeing the plan every
-              time the row is read is the reminder; the schedule lives on the detail page. */}
-          {topPlan ? (
-            <span className="line-clamp-2 text-xs text-foreground/80 sm:truncate">
-              <span className="text-muted-foreground">If</span> {topPlan.cue}
-              {topPlan.response ? (
-                <>
-                  <span className="text-primary"> → </span>
-                  {topPlan.response}
-                </>
-              ) : null}
-              {today.streak > 0 ? (
-                <span className="text-muted-foreground"> · {today.streak} day streak</span>
-              ) : null}
-            </span>
+          {/* DEV_NOTE: the tracker's priority plan(s) take the schedule's place — seeing them every
+              time the row is read is the reminder; the schedule lives on the detail page. Marking
+              more than one plan priority (Plans tab) stacks them here instead of picking just one. */}
+          {today.displayPlans.length > 0 ? (
+            today.displayPlans.map((plan, index) => (
+              <span
+                key={plan.publicId}
+                className="line-clamp-2 text-xs text-foreground/80 sm:truncate"
+              >
+                <span className="text-muted-foreground">If</span> {plan.cue}
+                {plan.response ? (
+                  <>
+                    <span className="text-primary"> → </span>
+                    {plan.response}
+                  </>
+                ) : null}
+                {index === today.displayPlans.length - 1 && today.streak > 0 ? (
+                  <span className="text-muted-foreground"> · {today.streak} day streak</span>
+                ) : null}
+              </span>
+            ))
           ) : (
             <span className="truncate text-xs text-muted-foreground">
               {describeSchedule(tracker.manifest.schedule)}

@@ -19,8 +19,8 @@ export default class TrackerPlansDAL {
 
   // --- plans -----------------------------------------------------------------------------------
 
-  // DEV_NOTE: appended after the tracker's existing plans — the first plan is what the Today row
-  // shows, and adding a second trigger shouldn't silently replace the reminder the user already had.
+  // DEV_NOTE: appended after the tracker's existing plans — sortOrder is display order within the
+  // Plans tab, independent of isPriority (which plans surface on the Today row).
   async createPlan(params: Schemas.CreateTrackerPlanDALRequest) {
     const response: Schemas.ApiResponse & { plan?: Schemas.TrackerPlan } = { isSuccess: false };
 
@@ -45,6 +45,7 @@ export default class TrackerPlansDAL {
           trackerId: params.trackerId,
           cue: params.cue,
           response: params.response,
+          isPriority: false,
           sortOrder: (last?.sortOrder ?? -1) + 1,
           createdAt: now,
           updatedAt: null,

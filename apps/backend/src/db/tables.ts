@@ -210,6 +210,7 @@ export const trackerPlans = table(
     trackerId: t.integer("tracker_id").notNull(),
     cue: t.text().notNull(),
     response: t.text(),
+    isPriority: t.integer("is_priority", { mode: "boolean" }).notNull().default(false),
     sortOrder: t.integer("sort_order").notNull().default(0),
     createdAt: t.integer("created_at", { mode: "timestamp" }).notNull(),
     updatedAt: t.integer("updated_at", { mode: "timestamp" }),

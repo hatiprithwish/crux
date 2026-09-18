@@ -295,9 +295,13 @@ export interface TrackerTodayApiShape {
   todayCount: number;
   streak: number;
   openSession: TrackerEntryApiShape | null; // timer trackers only
-  // DEV_NOTE: every live if-then plan, in the user's order — the row shows the first as a standing
-  // reminder and the capture sheet offers all of them as one-tap triggers, off this same request.
+  // DEV_NOTE: every live if-then plan, in the user's order — the capture sheet offers all of them
+  // as one-tap triggers, off this same request.
   plans: TrackerPlanApiShape[];
+  // DEV_NOTE: the subset the row itself shows as a standing reminder — every plan marked isPriority,
+  // and nothing when none are (the user chose not to star anything). A separate field from `plans`
+  // because the capture sheet still needs every live plan as a choice, not just the starred ones.
+  displayPlans: TrackerPlanApiShape[];
 }
 
 // DEV_NOTE: the Today screen's 24h ruler — one tick per entry logged today, across every tracker.

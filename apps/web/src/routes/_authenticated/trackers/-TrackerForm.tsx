@@ -623,38 +623,47 @@ export function TrackerForm({
               {(scheduleType) =>
                 scheduleType === "days_of_week" ? (
                   <form.Field name="scheduleDays">
-                    {(field) => (
-                      <div className="flex flex-col gap-2">
-                        <div className="flex flex-wrap gap-1">
-                          {DAY_NAMES.map((dayName, day) => {
-                            const selected = field.state.value.includes(day);
-                            return (
-                              <button
-                                key={dayName}
-                                type="button"
-                                aria-pressed={selected}
-                                onClick={() =>
-                                  field.handleChange(
+                    {(field) => {
+                      // DEV_NOTE: mirrors the Array.isArray guard in valuesFromTracker — belt and
+                      // braces alongside the `key` on this element (see the sibling branches below):
+                      // the key stops React from reusing the previous branch's form.Field instance
+                      // (scheduleCount/scheduleIntervalDays are numbers) when the schedule tile
+                      // switches, but this stays as a second line of defence against any other path
+                      // that hands the field a non-array snapshot.
+                      const days = Array.isArray(field.state.value) ? field.state.value : [];
+                      return (
+                        <div className="flex flex-col gap-2">
+                          <div className="flex flex-wrap gap-1">
+                            {DAY_NAMES.map((dayName, day) => {
+                              const selected = days.includes(day);
+                              return (
+                                <button
+                                  key={dayName}
+                                  type="button"
+                                  aria-pressed={selected}
+                                  onClick={() =>
+                                    field.handleChange(
+                                      selected
+                                        ? days.filter((value) => value !== day)
+                                        : [...days, day],
+                                    )
+                                  }
+                                  className={cn(
+                                    "border px-2.5 py-1 text-xs transition-colors",
                                     selected
-                                      ? field.state.value.filter((value) => value !== day)
-                                      : [...field.state.value, day],
-                                  )
-                                }
-                                className={cn(
-                                  "border px-2.5 py-1 text-xs transition-colors",
-                                  selected
-                                    ? "border-primary bg-primary text-primary-foreground"
-                                    : "border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                                )}
-                              >
-                                {dayName}
-                              </button>
-                            );
-                          })}
+                                      ? "border-primary bg-primary text-primary-foreground"
+                                      : "border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                                  )}
+                                >
+                                  {dayName}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <FieldError errors={field.state.meta.errors} />
                         </div>
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
+                      );
+                    }}
                   </form.Field>
                 ) : scheduleType === "times_per_week" ? (
                   <form.Field name="scheduleCount">

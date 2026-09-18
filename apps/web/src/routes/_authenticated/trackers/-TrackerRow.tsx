@@ -57,14 +57,16 @@ export default function TrackerRow({ today }: TrackerRowProps) {
         // px-6 matches every other section on the screen — the row is the page's content now, not
         // a card inside a centred column. Name and control share one line (design/today-web.png) —
         // editing/archiving a tracker is the management list's job (/trackers/all), not this row's.
-        // flex-wrap is the fallback for a control too wide for a narrow phone (a timer's label
-        // field, an amount pad's three inputs) — it drops to its own line instead of forcing the
-        // whole page into horizontal scroll.
-        "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border px-6 py-4",
+        // items-start (not -center) because starring several plans can grow the left column past
+        // the control's own height — the streak and quick-add stay pinned to the name line instead
+        // of drifting to the block's vertical middle. flex-wrap is the fallback for a control too
+        // wide for a narrow phone (a timer's label field, an amount pad's three inputs) — it drops
+        // to its own line instead of forcing the whole page into horizontal scroll.
+        "flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-border px-6 py-4",
         isRunning && "border-l-2 border-l-primary bg-primary/5 pl-5.5",
       )}
     >
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-start gap-3">
         {/* DEV_NOTE: the slot is rendered whether or not the tracker has an icon, so every name
             in the list starts at the same x — a list where only some rows are indented is harder
             to scan than one with no icons at all. */}
@@ -83,27 +85,32 @@ export default function TrackerRow({ today }: TrackerRowProps) {
               {tracker.name}
             </Link>
           </span>
-          {/* DEV_NOTE: the tracker's priority plan(s) take the schedule's place — seeing them every
-              time the row is read is the reminder; the schedule lives on the detail page. Marking
-              more than one plan priority (Plans tab) stacks them here instead of picking just one. */}
           {today.displayPlans.length > 0 ? (
-            today.displayPlans.map((plan, index) => (
-              <span
-                key={plan.publicId}
-                className="line-clamp-2 text-xs text-foreground/80 sm:truncate"
-              >
-                <span className="text-muted-foreground">If</span> {plan.cue}
-                {plan.response ? (
-                  <>
-                    <span className="text-primary"> → </span>
-                    {plan.response}
-                  </>
-                ) : null}
-                {index === today.displayPlans.length - 1 && today.streak > 0 ? (
-                  <span className="text-muted-foreground"> · {today.streak} day streak</span>
-                ) : null}
-              </span>
-            ))
+            <>
+              {today.streak > 0 ? (
+                <span className="text-xs text-muted-foreground">{today.streak} day streak</span>
+              ) : null}
+              {/* DEV_NOTE: the tracker's priority plan(s) take the schedule's place — seeing them
+                  every time the row is read is the reminder; the schedule lives on the detail page.
+                  Marking more than one plan priority (Plans tab) stacks them here instead of picking
+                  just one. The streak sits above them, not trailing the last line, so it and the
+                  quick-add control read together as the row's top line regardless of how many plans
+                  are starred. */}
+              {today.displayPlans.map((plan) => (
+                <span
+                  key={plan.publicId}
+                  className="line-clamp-2 text-xs text-foreground/80 sm:truncate"
+                >
+                  <span className="text-muted-foreground">If</span> {plan.cue}
+                  {plan.response ? (
+                    <>
+                      <span className="text-primary"> → </span>
+                      {plan.response}
+                    </>
+                  ) : null}
+                </span>
+              ))}
+            </>
           ) : (
             <span className="truncate text-xs text-muted-foreground">
               {describeSchedule(tracker.manifest.schedule)}

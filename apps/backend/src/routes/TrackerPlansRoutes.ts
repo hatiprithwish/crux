@@ -41,24 +41,6 @@ TrackerPlansRoutes.post(
   },
 );
 
-// DEV_NOTE: registered before /plans/:planPublicId so "reorder" is never parsed as a plan publicId.
-TrackerPlansRoutes.post(
-  "/plans/reorder",
-  checkAuth,
-  zValidator("param", ZTrackerParam),
-  zValidator("json", Schemas.ZReorderTrackerPlansApiRequest),
-  async (c) => {
-    const userId = c.get("clerkUserId");
-    const { trackerPublicId } = c.req.valid("param");
-    const body = c.req.valid("json");
-
-    const repo = new TrackerPlansRepo(c.env);
-    const response = await repo.reorderPlans({ ...body, userId, trackerPublicId });
-
-    return c.json(response, response.isSuccess ? 200 : 400);
-  },
-);
-
 TrackerPlansRoutes.patch(
   "/plans/:planPublicId",
   checkAuth,

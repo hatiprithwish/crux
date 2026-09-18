@@ -58,7 +58,6 @@ export enum LogAction {
   GetTrackerPlans = "GetTrackerPlans",
   UpdateTrackerPlan = "UpdateTrackerPlan",
   DeleteTrackerPlan = "DeleteTrackerPlan",
-  ReorderTrackerPlans = "ReorderTrackerPlans",
   CreateTrackerMoment = "CreateTrackerMoment",
   GetTrackerMoments = "GetTrackerMoments",
   DeleteTrackerMoment = "DeleteTrackerMoment",

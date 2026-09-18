@@ -15,10 +15,6 @@ export type GetTrackerPlansForTrackersDALRequest = Pick<TrackerPlan, "userId"> &
   trackerIds: number[];
 };
 
-export type ReorderTrackerPlansDALRequest = Pick<TrackerPlan, "userId"> & {
-  order: { id: number; sortOrder: number }[];
-};
-
 export type CreateTrackerMomentDALRequest = Pick<
   TrackerMoment,
   "userId" | "trackerId" | "planId" | "momentOutcome" | "localDate" | "note"

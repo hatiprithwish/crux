@@ -3,11 +3,10 @@ import { useForm } from "@tanstack/react-form";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/tanstack-react-start";
 import { z } from "zod";
-import { Info } from "@phosphor-icons/react";
+import { InfoHint } from "@/components/InfoHint";
 import { Button } from "@/shadcn/ui/button";
 import { Input } from "@/shadcn/ui/input";
 import { FieldError } from "@/shadcn/ui/field";
-import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover";
 import {
   Select,
   SelectContent,
@@ -1371,28 +1370,6 @@ function SectionHeading({ index, title }: { index: number; title: string }) {
         {index} · {title}
       </p>
     </div>
-  );
-}
-
-// DEV_NOTE: a popover rather than a tooltip — this explains a modelling decision in two sentences,
-// and a hover-only tooltip would be both unreadable at that length and unreachable on touch. The
-// trigger is a real button so it's keyboard-reachable, and `aria-label` carries what the icon means.
-function InfoHint({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label={label}
-          className="text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground"
-        >
-          <Info size={14} weight="bold" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="max-w-xs text-xs leading-relaxed">
-        {children}
-      </PopoverContent>
-    </Popover>
   );
 }
 

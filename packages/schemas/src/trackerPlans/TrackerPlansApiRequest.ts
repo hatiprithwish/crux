@@ -16,13 +16,6 @@ export const ZUpdateTrackerPlanApiRequest = z.object({
 });
 export type UpdateTrackerPlanApiRequest = z.infer<typeof ZUpdateTrackerPlanApiRequest>;
 
-// DEV_NOTE: the whole order, same contract as ZReorderTrackersApiRequest — every live plan of the
-// tracker must be present.
-export const ZReorderTrackerPlansApiRequest = z.object({
-  planPublicIds: z.array(z.string()).min(1),
-});
-export type ReorderTrackerPlansApiRequest = z.infer<typeof ZReorderTrackerPlansApiRequest>;
-
 // DEV_NOTE: `planPublicId` or `newCue`, never both — capture happens mid-urge, so a trigger the user
 // hasn't named yet is created in the same request rather than forcing a detour to the plan editor.
 // Neither is also valid: "an urge hit and I don't know why" is still worth recording.

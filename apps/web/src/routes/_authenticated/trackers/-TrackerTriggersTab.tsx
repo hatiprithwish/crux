@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowUp, PencilSimple, Plus, Star, Trash } from "@phosphor-icons/react";
+import { PencilSimple, Plus, Star, Trash } from "@phosphor-icons/react";
 import * as Schemas from "@app/schemas";
 import { Button } from "@/shadcn/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip";
@@ -8,7 +8,6 @@ import {
   useCreateTrackerPlan,
   useDeleteTrackerMoment,
   useDeleteTrackerPlan,
-  useReorderTrackerPlans,
   useUpdateTrackerPlan,
 } from "./-data";
 import { TrackerPlanForm } from "./-TrackerPlanForm";
@@ -67,7 +66,6 @@ export function TrackerTriggersTab({
   const createPlan = useCreateTrackerPlan();
   const updatePlan = useUpdateTrackerPlan();
   const deletePlan = useDeleteTrackerPlan();
-  const reorderPlans = useReorderTrackerPlans();
   const deleteMoment = useDeleteTrackerMoment();
   const [editingPublicId, setEditingPublicId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -87,16 +85,6 @@ export function TrackerTriggersTab({
   }, [moments]);
 
   const noTrigger = tallies.get(NO_TRIGGER_KEY);
-
-  function moveToTop(planPublicId: string) {
-    reorderPlans.mutate({
-      publicId: tracker.publicId,
-      planPublicIds: [
-        planPublicId,
-        ...plans.map((plan) => plan.publicId).filter((publicId) => publicId !== planPublicId),
-      ],
-    });
-  }
 
   function togglePriority(plan: Schemas.TrackerPlanApiShape) {
     updatePlan.mutate({
@@ -144,7 +132,7 @@ export function TrackerTriggersTab({
               </p>
             ) : (
               <ul className="flex flex-col">
-                {plans.map((plan, index) => (
+                {plans.map((plan) => (
                   <li key={plan.publicId} className="border-b border-border px-6 py-4">
                     {editingPublicId === plan.publicId ? (
                       <TrackerPlanForm
@@ -178,17 +166,6 @@ export function TrackerTriggersTab({
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center">
-                          {index > 0 ? (
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={`Show "${plan.cue}" first`}
-                              disabled={reorderPlans.isPending}
-                              onClick={() => moveToTop(plan.publicId)}
-                            >
-                              <ArrowUp />
-                            </Button>
-                          ) : null}
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button

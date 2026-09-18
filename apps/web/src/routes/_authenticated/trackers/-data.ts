@@ -531,26 +531,6 @@ export function useDeleteTrackerPlan() {
   });
 }
 
-export function useReorderTrackerPlans() {
-  const { getToken } = useAuth();
-  const syncPlans = usePlansCacheSync();
-
-  return useMutation({
-    mutationFn: ({ publicId, planPublicIds }: { publicId: string; planPublicIds: string[] }) =>
-      apiClient<Schemas.WriteTrackerPlansApiResponse>(
-        `/trackers/${publicId}/plans/reorder`,
-        getToken,
-        { method: "POST", body: JSON.stringify({ planPublicIds }) },
-      ),
-    onSuccess: async (response, { publicId }) => {
-      await syncPlans(publicId, response.plans, response.message);
-    },
-    onError: () => {
-      toast.error("Failed to reorder plans. Please try again.");
-    },
-  });
-}
-
 // DEV_NOTE: mutateAsync callers — the capture sheet awaits this before optionally logging an entry,
 // so a failed moment never leaves a stray entry behind it.
 export function useCreateTrackerMoment() {

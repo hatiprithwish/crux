@@ -129,41 +129,6 @@ export default class TrackerPlansRepo {
     return this.listPlans(params.userId, tracker.id, "Plan deleted successfully");
   }
 
-  async reorderPlans(
-    params: Schemas.ReorderTrackerPlansApiRequest & { userId: string; trackerPublicId: string },
-  ): Promise<Schemas.WriteTrackerPlansApiResponse> {
-    const { tracker, message } = await this.resolveTracker(params.userId, params.trackerPublicId);
-    if (!tracker) return { isSuccess: false, message };
-
-    const existing = await this.trackerPlansDal.getPlans({
-      userId: params.userId,
-      trackerId: tracker.id,
-    });
-    if (!existing.isSuccess || !existing.plans) {
-      return { isSuccess: false, message: existing.message };
-    }
-
-    const byPublicId = new Map(existing.plans.map((plan) => [plan.publicId, plan]));
-    const isCompleteReorder =
-      params.planPublicIds.length === byPublicId.size &&
-      new Set(params.planPublicIds).size === byPublicId.size &&
-      params.planPublicIds.every((publicId) => byPublicId.has(publicId));
-    if (!isCompleteReorder) {
-      return { isSuccess: false, message: "Reorder must include every plan exactly once" };
-    }
-
-    const reordered = await this.trackerPlansDal.reorderPlans({
-      userId: params.userId,
-      order: params.planPublicIds.map((publicId, index) => ({
-        id: (byPublicId.get(publicId) as Schemas.TrackerPlan).id,
-        sortOrder: index,
-      })),
-    });
-    if (!reordered.isSuccess) return { isSuccess: false, message: reordered.message };
-
-    return this.listPlans(params.userId, tracker.id, "Plans reordered successfully");
-  }
-
   // --- moments ---------------------------------------------------------------------------------
 
   async getMoments(params: {

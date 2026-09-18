@@ -7,8 +7,8 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowsDownUp, CaretDown, CaretUp, DotsSixVertical, Info } from "@phosphor-icons/react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip";
+import { ArrowsDownUp, CaretDown, CaretUp, DotsSixVertical } from "@phosphor-icons/react";
+import { InfoHint } from "@/components/InfoHint";
 import { TableHead, TableHeader, TableRow } from "@/shadcn/ui/table";
 import type { AppTableColumn, AppTableSortDirection } from "./AppTable.types";
 import { AppTableColumnMenu } from "./AppTableColumnMenu";
@@ -104,14 +104,9 @@ function SortableHeaderCell<TRow>({
         {sortIcon}
 
         {column.headerTooltip && (
-          <Tooltip>
-            <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Info className="h-3 w-3 text-muted-foreground/60 hover:text-muted-foreground cursor-pointer" />
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="max-w-xs text-xs">
-              {column.headerTooltip}
-            </TooltipContent>
-          </Tooltip>
+          <InfoHint label={`About ${column.header}`} iconClassName="size-3">
+            {column.headerTooltip}
+          </InfoHint>
         )}
       </div>
     </TableHead>

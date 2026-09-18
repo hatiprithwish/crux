@@ -302,49 +302,6 @@ export default class TrackerPlansDAL {
     return response;
   }
 
-  async reorderPlans(params: Schemas.ReorderTrackerPlansDALRequest) {
-    const response: Schemas.ApiResponse = { isSuccess: false };
-
-    if (params.order.length === 0) {
-      response.isSuccess = true;
-      response.message = "Plans reordered successfully";
-      return response;
-    }
-
-    try {
-      const now = new Date();
-      const statements = params.order.map(({ id, sortOrder }) =>
-        this.db
-          .update(trackerPlans)
-          .set({ sortOrder, updatedAt: now })
-          .where(
-            and(
-              eq(trackerPlans.id, id),
-              eq(trackerPlans.userId, params.userId),
-              isNull(trackerPlans.deletedAt),
-            ),
-          ),
-      );
-      const [first, ...rest] = statements;
-      await this.db.batch([first, ...rest]);
-
-      response.isSuccess = true;
-      response.message = "Plans reordered successfully";
-    } catch (error) {
-      const message = "Unknown error in reordering plans";
-      AppLogger.error({
-        category: Schemas.LogCategory.DAL,
-        action: Schemas.LogAction.ReorderTrackerPlans,
-        message,
-        error,
-        metadata: params,
-      });
-      response.message = message;
-    }
-
-    return response;
-  }
-
   // --- moments ---------------------------------------------------------------------------------
 
   async createMoment(params: Schemas.CreateTrackerMomentDALRequest) {

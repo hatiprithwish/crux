@@ -122,7 +122,7 @@ describe("Tracker plans and moments", () => {
     expect(row?.plans.map((plan) => plan.cue)).toEqual(["Phone in bed", "Bored after dinner"]);
   });
 
-  it("updates, reorders and deletes plans", async () => {
+  it("updates and deletes plans", async () => {
     signInAs(TEST_USER_ID);
     const plans = await call<Schemas.GetTrackerPlansApiResponse>(
       `/trackers/${trackerPublicId}/plans`,
@@ -136,22 +136,6 @@ describe("Tracker plans and moments", () => {
     );
     expect(updated.status).toBe(200);
     expect(updated.json.plans?.[1].response).toBe("Walk for 10 minutes");
-
-    const partial = await call(`/trackers/${trackerPublicId}/plans/reorder`, "POST", {
-      planPublicIds: [bored.publicId],
-    });
-    expect(partial.status).toBe(400);
-
-    const reordered = await call<Schemas.WriteTrackerPlansApiResponse>(
-      `/trackers/${trackerPublicId}/plans/reorder`,
-      "POST",
-      { planPublicIds: [bored.publicId, phone.publicId] },
-    );
-    expect(reordered.status).toBe(200);
-    expect(reordered.json.plans?.map((plan) => plan.publicId)).toEqual([
-      bored.publicId,
-      phone.publicId,
-    ]);
 
     const empty = await call(`/trackers/${trackerPublicId}/plans/${phone.publicId}`, "PATCH", {
       plan: {},

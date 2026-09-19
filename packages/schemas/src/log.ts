@@ -64,6 +64,7 @@ export enum LogAction {
 
   // Neuron — entries
   WriteEntry = "WriteEntry",
+  RekeyEntryDays = "RekeyEntryDays",
   GetEntries = "GetEntries",
   GetEntriesWithParts = "GetEntriesWithParts",
   DeleteEntry = "DeleteEntry",

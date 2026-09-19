@@ -222,14 +222,14 @@ export default class TrackersDAL {
     return response;
   }
 
-  async archiveTracker(params: { userId: string; publicId: string }) {
+  async archiveTracker(params: { userId: string; publicId: string; activeTo: string }) {
     const response: Schemas.ApiResponse & { tracker?: Schemas.Tracker } = { isSuccess: false };
 
     try {
       const now = new Date();
       const trackerResponse = await this.db
         .update(trackers)
-        .set({ archivedAt: now, activeTo: now.toISOString().slice(0, 10), updatedAt: now })
+        .set({ archivedAt: now, activeTo: params.activeTo, updatedAt: now })
         .where(
           and(
             eq(trackers.publicId, params.publicId),

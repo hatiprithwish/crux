@@ -1,11 +1,7 @@
-// DEV_NOTE: two differently-named functions on purpose — see architecture.md §4 invariant 4.
-// `users.tz` decides WHEN to fire a reminder (localHourIn/localDateIn). UTC decides WHICH day's
-// data a write/read lands on (utcDateString) — every entries.local_date and daily_facts.local_date
-// row is keyed by a UTC day, independent of the owner's timezone. Conflating the two means a
-// reminder fires at the right wall-clock hour but reads the wrong day's facts, or vice versa.
-
-// DEV_NOTE: the day key the WRITE path uses — TrackersRepo.todayLocalDate() and every entries/
-// daily_facts row. Never pass a user's tz in here; that's localDateIn.
+// DEV_NOTE: architecture.md §4 invariant 4 — `users.tz` decides both WHEN a reminder fires
+// (localHourIn) and WHICH day a row belongs to (localDateIn): entries.local_date and
+// daily_facts.local_date are keyed by the owner's own calendar day, not a UTC day.
+// utcDateString remains only for callers that genuinely want the UTC calendar day.
 export function utcDateString(at: Date): string {
   return at.toISOString().slice(0, 10);
 }
@@ -24,7 +20,7 @@ function partsIn(tz: string, at: Date): Record<string, string> {
   return Object.fromEntries(formatter.formatToParts(at).map((part) => [part.type, part.value]));
 }
 
-// Scheduling only — never a lookup key. Returns 0-23.
+// Returns 0-23.
 export function localHourIn(tz: string, at: Date): number {
   return Number(partsIn(tz, at).hour);
 }

@@ -1,6 +1,7 @@
 import TrackerPlansDAL, { type TrackerMomentWithPlan } from "@/data-access-layer/TrackerPlansDAL";
 import TrackersDAL from "@/data-access-layer/TrackersDAL";
-import { utcDateString } from "@/utils/DateTime";
+import UsersDAL from "@/data-access-layer/UsersDAL";
+import { localDateIn } from "@/utils/DateTime";
 import * as Schemas from "@app/schemas";
 
 // DEV_NOTE: plans and moments are children of a tracker, so every method resolves the tracker by
@@ -9,10 +10,12 @@ import * as Schemas from "@app/schemas";
 export default class TrackerPlansRepo {
   private trackerPlansDal: TrackerPlansDAL;
   private trackersDal: TrackersDAL;
+  private usersDal: UsersDAL;
 
   constructor(env: Env) {
     this.trackerPlansDal = new TrackerPlansDAL(env);
     this.trackersDal = new TrackersDAL(env);
+    this.usersDal = new UsersDAL(env);
   }
 
   toPlanApiShape(plan: Schemas.TrackerPlan): Schemas.TrackerPlanApiShape {
@@ -155,8 +158,8 @@ export default class TrackerPlansRepo {
     };
   }
 
-  // DEV_NOTE: a moment is always "now" — it is captured while the trigger is firing, and the UTC
-  // day matches how entries.local_date is resolved (see TrackersRepo's APP_TZ note).
+  // DEV_NOTE: a moment is always "now" — it is captured while the trigger is firing, and the
+  // owner's own day (users.tz) matches how entries.local_date is resolved.
   async createMoment(
     params: Schemas.CreateTrackerMomentApiRequest & { userId: string; trackerPublicId: string },
   ): Promise<Schemas.CreateTrackerMomentApiResponse> {
@@ -186,12 +189,15 @@ export default class TrackerPlansRepo {
       plan = created.plan;
     }
 
+    const userDetails = await this.usersDal.getUserDetails({ clerkId: params.userId });
+    const tz = userDetails.user?.tz ?? "UTC";
+
     const written = await this.trackerPlansDal.createMoment({
       userId: params.userId,
       trackerId: tracker.id,
       planId: plan?.id ?? null,
       momentOutcome: params.moment.momentOutcome,
-      localDate: utcDateString(new Date()),
+      localDate: localDateIn(tz, new Date()),
       note: params.moment.note ?? null,
     });
     if (!written.isSuccess || !written.moment) {

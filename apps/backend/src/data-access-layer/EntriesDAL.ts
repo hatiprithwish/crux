@@ -135,6 +135,146 @@ export default class EntriesDAL {
     return response;
   }
 
+  // DEV_NOTE: only source "manual" rows — a "manual_retro" row's local_date is a day the user picked,
+  // not one derived from when it was written, so it is never a candidate for re-keying.
+  async getRekeyCandidates(params: { userId: string }) {
+    const response: Schemas.ApiResponse & {
+      candidates?: Pick<
+        Schemas.Entry,
+        "id" | "entryKind" | "localDate" | "occurredAt" | "createdAt"
+      >[];
+    } = { isSuccess: false };
+
+    try {
+      response.candidates = await this.db
+        .select({
+          id: entries.id,
+          entryKind: entries.entryKind,
+          localDate: entries.localDate,
+          occurredAt: entries.occurredAt,
+          createdAt: entries.createdAt,
+        })
+        .from(entries)
+        .where(
+          and(
+            eq(entries.userId, params.userId),
+            eq(entries.source, "manual"),
+            isNull(entries.deletedAt),
+          ),
+        );
+      response.isSuccess = true;
+      response.message = "Re-key candidates fetched successfully";
+    } catch (error) {
+      const message = "Unknown error in fetching re-key candidates";
+      AppLogger.error({
+        category: Schemas.LogCategory.DAL,
+        action: Schemas.LogAction.RekeyEntryDays,
+        message,
+        error,
+        metadata: params,
+      });
+      response.message = message;
+    }
+
+    return response;
+  }
+
+  // DEV_NOTE: moves entries to the day they belong to, then recomputes daily_facts for both the day
+  // they left and the day they joined (invariant 1 — facts are derived, so they are rebuilt from
+  // entries rather than patched). Buckets are deduplicated first: a dozen entries moving between the
+  // same two days is two recomputes per metric, not twenty-four.
+  async rekeyEntries(params: {
+    userId: string;
+    tz: string;
+    moves: { entryId: number; from: string; to: string }[];
+  }) {
+    const response: Schemas.ApiResponse & { rekeyedCount?: number } = { isSuccess: false };
+
+    try {
+      const now = new Date();
+
+      const idsByTargetDate = new Map<string, number[]>();
+      for (const move of params.moves) {
+        const bucket = idsByTargetDate.get(move.to) ?? [];
+        bucket.push(move.entryId);
+        idsByTargetDate.set(move.to, bucket);
+      }
+      for (const [localDate, ids] of idsByTargetDate) {
+        for (const chunk of Utility.chunk(ids)) {
+          await this.db
+            .update(entries)
+            .set({ localDate, tz: params.tz, updatedAt: now, rev: sql`${entries.rev} + 1` })
+            .where(and(eq(entries.userId, params.userId), inArray(entries.id, chunk)));
+        }
+      }
+
+      const entryIds = params.moves.map((move) => move.entryId);
+      const metricsByEntry = new Map<number, number[]>();
+      const entitiesByEntry = new Map<number, number[]>();
+      for (const chunk of Utility.chunk(entryIds)) {
+        const [valueRows, linkRows] = await Promise.all([
+          this.db
+            .select({ entryId: entryValues.entryId, metricId: entryValues.metricId })
+            .from(entryValues)
+            .where(inArray(entryValues.entryId, chunk)),
+          this.db
+            .select({ entryId: entryEntities.entryId, entityId: entryEntities.entityId })
+            .from(entryEntities)
+            .where(inArray(entryEntities.entryId, chunk)),
+        ]);
+        for (const row of valueRows) {
+          metricsByEntry.set(row.entryId, [
+            ...(metricsByEntry.get(row.entryId) ?? []),
+            row.metricId,
+          ]);
+        }
+        for (const row of linkRows) {
+          entitiesByEntry.set(row.entryId, [
+            ...(entitiesByEntry.get(row.entryId) ?? []),
+            row.entityId,
+          ]);
+        }
+      }
+
+      const buckets = new Map<
+        string,
+        { localDate: string; metricId: number; entityId: number | null }
+      >();
+      for (const move of params.moves) {
+        for (const localDate of [move.from, move.to]) {
+          for (const metricId of metricsByEntry.get(move.entryId) ?? []) {
+            for (const entityId of [null, ...(entitiesByEntry.get(move.entryId) ?? [])]) {
+              buckets.set(`${localDate}|${metricId}|${entityId ?? ""}`, {
+                localDate,
+                metricId,
+                entityId,
+              });
+            }
+          }
+        }
+      }
+      for (const bucket of buckets.values()) {
+        await this.recomputeDailyFacts({ userId: params.userId, ...bucket });
+      }
+
+      response.isSuccess = true;
+      response.message = "Entries re-keyed successfully";
+      response.rekeyedCount = params.moves.length;
+    } catch (error) {
+      const message = "Unknown error in re-keying entries";
+      AppLogger.error({
+        category: Schemas.LogCategory.DAL,
+        action: Schemas.LogAction.RekeyEntryDays,
+        message,
+        error,
+        metadata: { userId: params.userId, moveCount: params.moves.length },
+      });
+      response.message = message;
+    }
+
+    return response;
+  }
+
   async getEntries(params: {
     userId: string;
     trackerId: number;

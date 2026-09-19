@@ -3,12 +3,13 @@ import EntriesDAL from "@/data-access-layer/EntriesDAL";
 import MetricsDAL from "@/data-access-layer/MetricsDAL";
 import TrackerPlansDAL from "@/data-access-layer/TrackerPlansDAL";
 import TrackersDAL from "@/data-access-layer/TrackersDAL";
+import UsersDAL from "@/data-access-layer/UsersDAL";
 import { factValue } from "@/manifest/Aggregation";
 import { planQuickAdd, type PlannedEntry } from "@/manifest/ControlHandlers";
 import { getComputeModule, validateComputeManifest } from "@/manifest/ComputeRegistry";
 import { addDays, computeStreak, dayState, isDueOn, resolveTargetAt } from "@/manifest/Scoring";
 import Utility from "@/utils/Utility";
-import { utcDateString } from "@/utils/DateTime";
+import { localDateIn, utcDateString } from "@/utils/DateTime";
 import type * as Schemas from "@app/schemas";
 
 // DEV_NOTE: architecture.md §7 step 4 — the manifest engine. One Repo for every tracker there will
@@ -17,17 +18,20 @@ import type * as Schemas from "@app/schemas";
 // any, handles what a control can't (ComputeRegistry). Composes the same shared DALs those Repos
 // did — there is no TrackersDAL-level change in this phase.
 //
-// DEV_NOTE: `users.tz` now exists (see DateTime.ts) but decides WHEN to send a reminder, never
-// WHICH day a row is written under — entries.local_date/daily_facts.local_date stay keyed by the
-// UTC day, so this stays "UTC" even for a user with a real tz set. entries.tz is stored per
-// invariant 4 so a genuine per-entry local day can replace this later without a data migration;
-// today it's always "UTC". See architecture.md §4 invariant 4.
-const APP_TZ = "UTC";
+// DEV_NOTE: architecture.md §4 invariant 4 — `users.tz` decides which calendar day a row belongs to.
+// entries.local_date/daily_facts.local_date are keyed by the owner's own day, and entries.tz stores
+// the zone that key was resolved in. Falls back to UTC only when the users row can't be read, so a
+// Today request degrades to the old boundary rather than failing outright.
+const FALLBACK_TZ = "UTC";
 
 // DEV_NOTE: how far back the Today screen's single daily_facts scan reaches. Long enough for any
 // streak a user will plausibly be mid-way through, short enough that listing N trackers stays one
 // bounded range scan. The heatmap endpoint takes its own explicit range and isn't capped by this.
 const STREAK_WINDOW_DAYS = 120;
+
+// DEV_NOTE: bounds the D1 round trips one rekeyEntryDays call can make (each move fans out into
+// value/entity reads and daily_facts recomputes); the caller loops until remainingCount is 0.
+const REKEY_BATCH_SIZE = 60;
 
 type MetricLookup = {
   byId: Map<number, Schemas.Metric>;
@@ -41,6 +45,7 @@ export default class TrackersRepo {
   private metricsDal: MetricsDAL;
   private trackerPlansDal: TrackerPlansDAL;
   private trackersDal: TrackersDAL;
+  private usersDal: UsersDAL;
 
   constructor(env: Env) {
     this.trackerPlansDal = new TrackerPlansDAL(env);
@@ -48,12 +53,18 @@ export default class TrackersRepo {
     this.entriesDal = new EntriesDAL(env);
     this.metricsDal = new MetricsDAL(env);
     this.trackersDal = new TrackersDAL(env);
+    this.usersDal = new UsersDAL(env);
   }
 
   // --- date helpers ----------------------------------------------------------------------------
 
-  private todayLocalDate(): string {
-    return utcDateString(new Date());
+  private async resolveTz(userId: string): Promise<string> {
+    const result = await this.usersDal.getUserDetails({ clerkId: userId });
+    return result.user?.tz ?? FALLBACK_TZ;
+  }
+
+  private todayLocalDate(tz: string): string {
+    return localDateIn(tz, new Date());
   }
 
   private toTargetApiShape(target: Schemas.TrackerTarget): Schemas.TrackerTargetApiShape {
@@ -342,6 +353,7 @@ export default class TrackersRepo {
     // been written yet.
     const targetChanged =
       manifest !== undefined && manifest.target !== existing.tracker.manifest.target;
+    const tz = targetChanged ? await this.resolveTz(params.userId) : FALLBACK_TZ;
     if (targetChanged) {
       const written = await this.trackersDal.createTrackerTarget({
         userId: params.userId,
@@ -349,7 +361,7 @@ export default class TrackersRepo {
         // Today unless the caller says otherwise — "I've decided to aim higher" is a statement
         // about now. An explicit date is how a user backdates a goal they adopted before they got
         // around to typing it in.
-        effectiveFrom: params.targetEffectiveFrom ?? this.todayLocalDate(),
+        effectiveFrom: params.targetEffectiveFrom ?? this.todayLocalDate(tz),
         target: manifest.target,
       });
       if (!written.isSuccess) {
@@ -374,7 +386,7 @@ export default class TrackersRepo {
       }
       manifestToWrite = {
         ...manifest,
-        target: resolveTargetAt(history.targets ?? [], this.todayLocalDate()),
+        target: resolveTargetAt(history.targets ?? [], this.todayLocalDate(tz)),
       };
     }
 
@@ -514,7 +526,8 @@ export default class TrackersRepo {
     });
     if (!result.isSuccess) return { isSuccess: false, message: result.message };
 
-    const current = resolveTargetAt(result.targets ?? [], this.todayLocalDate());
+    const tz = await this.resolveTz(tracker.userId);
+    const current = resolveTargetAt(result.targets ?? [], this.todayLocalDate(tz));
     if (current === tracker.manifest.target) return { isSuccess: true };
 
     const updated = await this.trackersDal.updateTracker({
@@ -550,7 +563,7 @@ export default class TrackersRepo {
       return { isSuccess: true, message: "Trackers fetched successfully", trackers: shapes };
     }
 
-    const today = this.todayLocalDate();
+    const today = this.todayLocalDate(await this.resolveTz(params.userId));
     const windowStart = addDays(today, -(STREAK_WINDOW_DAYS - 1));
 
     // DEV_NOTE: one range scan for every tracker's primary metric — the Today screen renders N
@@ -695,7 +708,7 @@ export default class TrackersRepo {
     userId: string;
     date?: string;
   }): Promise<Schemas.GetTrackerTimelineApiResponse> {
-    const localDate = params.date ?? this.todayLocalDate();
+    const localDate = params.date ?? this.todayLocalDate(await this.resolveTz(params.userId));
 
     const [entriesResult, trackersResult] = await Promise.all([
       this.entriesDal.getEntriesForDate({ userId: params.userId, localDate }),
@@ -745,7 +758,11 @@ export default class TrackersRepo {
   }
 
   async archiveTracker(params: { userId: string; publicId: string }): Promise<Schemas.ApiResponse> {
-    const result = await this.trackersDal.archiveTracker(params);
+    const tz = await this.resolveTz(params.userId);
+    const result = await this.trackersDal.archiveTracker({
+      ...params,
+      activeTo: this.todayLocalDate(tz),
+    });
     return { isSuccess: result.isSuccess, message: result.message };
   }
 
@@ -776,6 +793,49 @@ export default class TrackersRepo {
       isSuccess: result.isSuccess,
       message: result.message,
       restoredCount: result.restoredCount,
+    };
+  }
+
+  // DEV_NOTE: one-time realignment of entries written while every day was keyed by UTC. Only rows
+  // whose stored day equals the UTC day of the moment they were written are touched — that is what
+  // "derived from the write time" looks like — so a day the user picked (manual_retro) and any row
+  // already keyed correctly are left alone, which also makes a repeat call a no-op. A point entry's
+  // occurred_at is a placeholder (midnight UTC of its day), so created_at is its real moment; an
+  // interval's occurred_at is the real start.
+  async rekeyEntryDays(params: { userId: string }): Promise<Schemas.RekeyEntryDaysApiResponse> {
+    const tz = await this.resolveTz(params.userId);
+
+    const result = await this.entriesDal.getRekeyCandidates({ userId: params.userId });
+    if (!result.isSuccess || !result.candidates) {
+      return { isSuccess: false, message: result.message };
+    }
+
+    const moves: { entryId: number; from: string; to: string }[] = [];
+    for (const entry of result.candidates) {
+      const moment = entry.entryKind === "interval" ? entry.occurredAt : entry.createdAt;
+      if (entry.localDate !== utcDateString(moment)) continue;
+      const to = localDateIn(tz, moment);
+      if (to !== entry.localDate) moves.push({ entryId: entry.id, from: entry.localDate, to });
+    }
+
+    const batch = moves.slice(0, REKEY_BATCH_SIZE);
+    if (batch.length === 0) {
+      return {
+        isSuccess: true,
+        message: "Entries already match your timezone",
+        rekeyedCount: 0,
+        remainingCount: 0,
+      };
+    }
+
+    const applied = await this.entriesDal.rekeyEntries({ userId: params.userId, tz, moves: batch });
+    if (!applied.isSuccess) return { isSuccess: false, message: applied.message };
+
+    return {
+      isSuccess: true,
+      message: "Entries re-keyed successfully",
+      rekeyedCount: batch.length,
+      remainingCount: moves.length - batch.length,
     };
   }
 
@@ -954,6 +1014,7 @@ export default class TrackersRepo {
     }
     const targets = targetsResult.targets ?? [];
 
+    const tz = await this.resolveTz(params.userId);
     const days: Schemas.TrackerHeatmapDay[] = [];
     for (let date = params.dateFrom; date <= params.dateTo; date = addDays(date, 1)) {
       // DEV_NOTE: the day's own target travels with the day, which is what lets the client draw a
@@ -971,7 +1032,7 @@ export default class TrackersRepo {
       isSuccess: true,
       message: "Heatmap fetched successfully",
       days,
-      streak: computeStreak(sums, tracker, targets, this.todayLocalDate()),
+      streak: computeStreak(sums, tracker, targets, this.todayLocalDate(tz)),
     };
   }
 
@@ -1049,11 +1110,12 @@ export default class TrackersRepo {
       return { isSuccess: false, message: "Tracker's primary metric not found" };
     }
 
+    const tz = await this.resolveTz(params.userId);
     const plan = planQuickAdd({
       manifest: tracker.manifest,
       payload: params.payload,
       primaryMetricKey: primaryMetric.key,
-      todayLocalDate: this.todayLocalDate(),
+      todayLocalDate: this.todayLocalDate(tz),
       now: new Date(),
     });
     if (!plan.isSuccess || !plan.action) {
@@ -1093,17 +1155,17 @@ export default class TrackersRepo {
           });
         }
 
-        return this.writePlanned(params.userId, tracker, action.entry, metrics);
+        return this.writePlanned(params.userId, tracker, action.entry, metrics, tz);
       }
 
       case "replace_day": {
         const cleared = await this.clearDay(params.userId, tracker.id, action.localDate);
         if (!cleared.isSuccess) return cleared;
-        return this.writePlanned(params.userId, tracker, action.entry, metrics);
+        return this.writePlanned(params.userId, tracker, action.entry, metrics, tz);
       }
 
       case "append":
-        return this.writePlanned(params.userId, tracker, action.entry, metrics);
+        return this.writePlanned(params.userId, tracker, action.entry, metrics, tz);
 
       case "start_interval": {
         // DEV_NOTE: one running session per tracker — carried over from TimeRepo.startTimer. Two
@@ -1115,7 +1177,7 @@ export default class TrackersRepo {
         if (!open.isSuccess) return { isSuccess: false, message: open.message };
         if (open.entry) return { isSuccess: false, message: "A timer is already running" };
 
-        return this.writePlanned(params.userId, tracker, action.entry, metrics);
+        return this.writePlanned(params.userId, tracker, action.entry, metrics, tz);
       }
 
       case "stop_interval":
@@ -1149,6 +1211,7 @@ export default class TrackersRepo {
     tracker: Schemas.Tracker,
     planned: PlannedEntry,
     metrics: MetricLookup,
+    tz: string,
   ): Promise<Schemas.QuickAddApiResponse> {
     const values: {
       metricId: number;
@@ -1183,7 +1246,7 @@ export default class TrackersRepo {
       occurredAt: planned.occurredAt,
       endedAt: planned.endedAt,
       localDate: planned.localDate,
-      tz: APP_TZ,
+      tz,
       label: planned.label,
       note: planned.note,
       source: planned.source,
@@ -1358,7 +1421,7 @@ export default class TrackersRepo {
       {
         userId: params.userId,
         tracker,
-        tz: APP_TZ,
+        tz: await this.resolveTz(params.userId),
         entriesDal: this.entriesDal,
         entitiesDal: this.entitiesDal,
         metricIdByKey: new Map(

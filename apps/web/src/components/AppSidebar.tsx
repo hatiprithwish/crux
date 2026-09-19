@@ -4,6 +4,7 @@ import { useAuth, UserButton } from "@clerk/tanstack-react-start";
 import { useQuery } from "@tanstack/react-query";
 import { UsersQueries } from "@/providers/UsersQueries";
 import { cn } from "@/utils/tailwind";
+import { getLocalDateOf } from "@/utils/timeZone";
 
 interface NavItem {
   to: "/trackers" | "/trackers/all" | "/metrics" | "/entities";
@@ -33,13 +34,8 @@ export function useDayNumber(): number | null {
   const createdAt = data?.user?.createdAt;
   if (!createdAt) return null;
 
-  const created = new Date(createdAt);
-  const startOfCreated = Date.UTC(
-    created.getUTCFullYear(),
-    created.getUTCMonth(),
-    created.getUTCDate(),
-  );
-  const startOfToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const startOfCreated = Date.parse(`${getLocalDateOf(new Date(createdAt))}T00:00:00.000Z`);
+  const startOfToday = Date.parse(`${getLocalDateOf(now)}T00:00:00.000Z`);
 
   return Math.round((startOfToday - startOfCreated) / (1000 * 60 * 60 * 24)) + 1;
 }

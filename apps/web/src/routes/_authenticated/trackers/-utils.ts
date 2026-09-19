@@ -1,11 +1,10 @@
 import { useSyncExternalStore } from "react";
 import type * as Schemas from "@app/schemas";
 import Utilities from "@/utils";
+import { getLocalDateOf } from "@/utils/timeZone";
 
-// DEV_NOTE: no per-user timezone preference exists anywhere in the app yet — dates are UTC-based
-// end to end (frontend and backend both), consistent with how the backend computes localDate.
 export function getTodayLocalDate(): string {
-  return new Date().toISOString().slice(0, 10);
+  return getLocalDateOf(new Date());
 }
 
 export function addDaysToLocalDate(localDate: string, delta: number): string {

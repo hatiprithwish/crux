@@ -1,8 +1,10 @@
 import { createFileRoute, Outlet, Link } from "@tanstack/react-router";
 import { useAuth } from "@clerk/tanstack-react-start";
 import { useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/shadcn/ui/button";
 import { apiClient } from "@/providers/apiClient";
+import { UsersQueries } from "@/providers/UsersQueries";
 import { AppSidebar, AppBottomNav } from "@/components/AppSidebar";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -12,6 +14,7 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
   const syncedRef = useRef(false);
+  const userQuery = useQuery({ ...UsersQueries.me(getToken), enabled: Boolean(isSignedIn) });
 
   useEffect(() => {
     if (!isSignedIn || syncedRef.current) return;
@@ -33,6 +36,10 @@ function AuthenticatedLayout() {
       </div>
     );
   }
+
+  // DEV_NOTE: held until /users/me settles (success or failure) so no screen's first render computes
+  // "today" in the device zone and then flips once users.tz arrives — see UsersQueries.me.
+  if (userQuery.isPending) return null;
 
   return (
     // DEV_NOTE: min-h-dvh, not min-h-screen — 100vh on a mobile browser measures past the

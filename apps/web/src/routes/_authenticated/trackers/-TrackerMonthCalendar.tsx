@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import type * as Schemas from "@app/schemas";
 import { Button } from "@/shadcn/ui/button";
-import { addDaysToLocalDate } from "./-utils";
+import { addDaysToLocalDate, getTodayLocalDate } from "./-utils";
 import TrackerHeatmapCell, { STATE_CLASSES, STATE_LABELS } from "./-TrackerHeatmapCell";
 
 interface TrackerMonthCalendarProps {
@@ -65,7 +65,7 @@ export function TrackerMonthCalendar({
   const earliestMonth = days[0] ? monthKey(days[0].localDate) : null;
   const latestMonth = days[days.length - 1] ? monthKey(days[days.length - 1].localDate) : null;
 
-  const [month, setMonth] = useState(() => latestMonth ?? monthKey(new Date().toISOString()));
+  const [month, setMonth] = useState(() => latestMonth ?? monthKey(getTodayLocalDate()));
 
   if (!earliestMonth || !latestMonth) {
     return (

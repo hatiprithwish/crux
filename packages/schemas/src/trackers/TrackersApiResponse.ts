@@ -88,6 +88,12 @@ export interface UnarchiveAllTrackersApiResponse extends ApiResponse {
   restoredCount?: number;
 }
 
+// DEV_NOTE: one call re-keys at most a bounded batch, so a caller loops until `remainingCount` is 0.
+export interface RekeyEntryDaysApiResponse extends ApiResponse {
+  rekeyedCount?: number;
+  remainingCount?: number;
+}
+
 // DEV_NOTE: always the whole history, ascending by effectiveFrom, never one row — a single target
 // row means nothing on its own ("300 from 1 Sept" is only a fact about September once you know
 // what follows it), and the screen that reads this renders the eras between rows.

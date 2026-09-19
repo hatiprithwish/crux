@@ -53,6 +53,17 @@ TrackersRoutes.post("/unarchive-all", checkAuth, async (c) => {
   return c.json(response, response.isSuccess ? 200 : 500);
 });
 
+// DEV_NOTE: registered before /:publicId below for the same reason as unarchive-all — "rekey-days"
+// must never be parsed as a tracker publicId.
+TrackersRoutes.post("/rekey-days", checkAuth, async (c) => {
+  const userId = c.get("clerkUserId");
+
+  const repo = new TrackersRepo(c.env);
+  const response = await repo.rekeyEntryDays({ userId });
+
+  return c.json(response, response.isSuccess ? 200 : 500);
+});
+
 // DEV_NOTE: registered before /:publicId below for the same reason as unarchive-all — "reorder"
 // must never be parsed as a tracker publicId.
 TrackersRoutes.post(

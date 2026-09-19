@@ -7,7 +7,7 @@ import { factValue } from "@/manifest/Aggregation";
 import { dayState, isScheduled, resolveTargetAt } from "@/manifest/Scoring";
 import { sendWebPush, type VapidKeys } from "@/providers/webPush";
 import AppLogger from "@/providers/logger";
-import { localHourIn, utcDateString } from "@/utils/DateTime";
+import { localDateIn, localHourIn } from "@/utils/DateTime";
 import Utility from "@/utils/Utility";
 import * as Schemas from "@app/schemas";
 
@@ -263,12 +263,13 @@ export default class NotificationsRepo {
   //      exist at any UTC instant (IANA offsets include :30/:45), so this is the entire timezone
   //      resolution; everything downstream is back to userId-scoped reads.
   //   4. Per bucket: getTrackersDueForReminder(chunk, hour) hits the partial index directly.
-  //   5. Filter in TS with isScheduled(utcDateString(at), manifest.schedule) — which *day* the
-  //      schedule allows isn't index-backed and doesn't belong in the WHERE clause.
+  //   5. Filter in TS with isScheduled(localDateIn(tz, at), manifest.schedule) — which *day* the
+  //      schedule allows isn't index-backed and doesn't belong in the WHERE clause. The day is the
+  //      owner's own calendar day, the same key entries.local_date is written under.
   //   6. Claim the dedup key (insert-before-send) and fan out with bounded concurrency.
   //
   // PR 4 adds two more triggers after the reminder fan-out above, both reusing tzByUserId/
-  // prefsByUserId/utcDate computed in steps 2-3: runStreakDigest (tz-gated on prefs.streakDigestHour)
+  // prefsByUserId computed in steps 2-3: runStreakDigest (tz-gated on prefs.streakDigestHour)
   // and runOpenIntervalNags (not tz-gated — see its own DEV_NOTE).
   async runHourlyDispatch(params: { at: Date }): Promise<Schemas.ApiResponse & { sent?: number }> {
     const subscribedResult = await this.dal.getSubscribedUserIds();
@@ -310,18 +311,20 @@ export default class NotificationsRepo {
       else usersByHour.set(hour, [userId]);
     }
 
-    const utcDate = utcDateString(params.at);
     const targets: ReminderTarget[] = [];
     for (const [hour, hourUserIds] of usersByHour) {
       for (const chunk of Utility.chunk(hourUserIds)) {
         const trackersResult = await this.dal.getTrackersDueForReminder({ userIds: chunk, hour });
         for (const tracker of trackersResult.trackers ?? []) {
-          if (!isScheduled(utcDate, tracker.manifestJson.schedule, tracker.activeFrom)) continue;
+          const ownerTz = tzByUserId.get(tracker.userId);
+          if (!ownerTz) continue;
+          const localDate = localDateIn(ownerTz, params.at);
+          if (!isScheduled(localDate, tracker.manifestJson.schedule, tracker.activeFrom)) continue;
           targets.push({
             userId: tracker.userId,
             trackerPublicId: tracker.publicId,
             trackerName: tracker.name,
-            dedupKey: `tracker_reminder:${tracker.publicId}:${utcDate}:${hour}`,
+            dedupKey: `tracker_reminder:${tracker.publicId}:${localDate}:${hour}`,
           });
         }
       }
@@ -372,7 +375,7 @@ export default class NotificationsRepo {
       pruned += result.pruned;
     });
 
-    // DEV_NOTE: reuses tzByUserId/prefsByUserId/utcDate/vapid from steps 2-3 above rather than
+    // DEV_NOTE: reuses tzByUserId/prefsByUserId/vapid from steps 2-3 above rather than
     // re-fetching — both PR 4 triggers ride the same subscribed-user set the reminder pass already
     // resolved. Digest is tz-gated (fires once, at the user's own streakDigestHour); open-interval
     // is not (see runOpenIntervalNags's own DEV_NOTE).
@@ -382,7 +385,7 @@ export default class NotificationsRepo {
       const prefs = prefsByUserId.get(candidateId) ?? Schemas.NOTIFICATION_PREFS_DEFAULTS;
       return prefs.streakDigestEnabled && localHourIn(tz, params.at) === prefs.streakDigestHour;
     });
-    const digest = await this.runStreakDigest(digestUserIds, utcDate, vapid);
+    const digest = await this.runStreakDigest(digestUserIds, tzByUserId, params.at, vapid);
 
     const openInterval = await this.runOpenIntervalNags({
       userIds,
@@ -420,7 +423,8 @@ export default class NotificationsRepo {
   // Scoring.ts so "still open today" is exactly what the heatmap would render for that tracker.
   private async runStreakDigest(
     userIds: string[],
-    utcDate: string,
+    tzByUserId: Map<string, string>,
+    at: Date,
     vapid: VapidKeys,
   ): Promise<{ candidates: number; delivered: number; pruned: number }> {
     let candidates = 0;
@@ -428,6 +432,10 @@ export default class NotificationsRepo {
     let pruned = 0;
 
     await Utility.mapWithConcurrency(userIds, SEND_CONCURRENCY, async (userId) => {
+      const userTz = tzByUserId.get(userId);
+      if (!userTz) return;
+      const localDate = localDateIn(userTz, at);
+
       const [trackersResult, metricsResult] = await Promise.all([
         this.trackersDal.getTrackers({ userId }),
         this.metricsDal.getMetrics({ userId }),
@@ -444,8 +452,8 @@ export default class NotificationsRepo {
         this.entriesDal.getDailyFactsForMetrics({
           userId,
           metricIds,
-          dateFrom: utcDate,
-          dateTo: utcDate,
+          dateFrom: localDate,
+          dateTo: localDate,
         }),
         this.trackersDal.getTrackerTargetsForTrackers({
           userId,
@@ -477,8 +485,8 @@ export default class NotificationsRepo {
       const open: string[] = [];
       for (const tracker of trackerRows) {
         const sums = sumsByMetric.get(tracker.primaryMetricId) ?? new Map<string, number>();
-        const target = resolveTargetAt(targetsByTracker.get(tracker.id) ?? [], utcDate);
-        const state = dayState(utcDate, sums, tracker, target);
+        const target = resolveTargetAt(targetsByTracker.get(tracker.id) ?? [], localDate);
+        const state = dayState(localDate, sums, tracker, target);
         if (state === "no_data" || state === "partial") open.push(tracker.name);
       }
       if (open.length === 0) return;
@@ -487,7 +495,7 @@ export default class NotificationsRepo {
       // DEV_NOTE: dedup key carries no per-tracker or per-user component of its own — see the plan's
       // dedup key table — because the composite PK on notification_sends is (userId, dedupKey), so
       // uniqueness per user per day comes from that column, not from the string.
-      const dedupKey = `streak_digest:-:${utcDate}`;
+      const dedupKey = `streak_digest:-:${localDate}`;
       const claim = await this.dal.claimNotificationSend({
         userId,
         dedupKey,

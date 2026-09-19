@@ -1,6 +1,7 @@
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/tanstack-react-start";
 import { apiClient } from "@/providers/apiClient";
+import { setActiveTimeZone } from "@/utils/timeZone";
 import type * as Schemas from "@app/schemas";
 import { toast } from "sonner";
 
@@ -16,8 +17,16 @@ export class UsersQueries {
   static me(getToken: () => Promise<string | null>) {
     return queryOptions({
       queryKey: UsersQueries.keys.me(),
-      queryFn: ({ signal }) =>
-        apiClient<Schemas.GetUserDetailsApiResponse>("/users/me", getToken, { signal }),
+      // DEV_NOTE: "today" is derived from users.tz on every screen, so it is set here — before the
+      // data reaches any consumer — rather than in a component, which would render once with the
+      // device zone first.
+      queryFn: async ({ signal }) => {
+        const response = await apiClient<Schemas.GetUserDetailsApiResponse>("/users/me", getToken, {
+          signal,
+        });
+        setActiveTimeZone(response.user?.tz ?? null);
+        return response;
+      },
     });
   }
 }
@@ -35,6 +44,12 @@ export function useUpdateUser() {
     onSuccess: (response) => {
       if (response.user) {
         queryClient.setQueryData(UsersQueries.keys.me(), response);
+        // DEV_NOTE: a new zone can move "today" to a different calendar day, so every cached
+        // screen keyed off it is stale, not just the user row.
+        setActiveTimeZone(response.user.tz);
+        void queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] !== UsersQueries.keys.me()[0],
+        });
       }
     },
     onError: () => {

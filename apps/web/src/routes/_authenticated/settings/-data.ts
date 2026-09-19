@@ -1,6 +1,7 @@
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/tanstack-react-start";
 import { apiClient } from "@/providers/apiClient";
+import { UsersQueries } from "@/providers/UsersQueries";
 import type * as Schemas from "@app/schemas";
 import { toast } from "sonner";
 
@@ -132,6 +133,43 @@ export function useSendTestNotification() {
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Failed to send test notification");
+    },
+  });
+}
+
+// DEV_NOTE: the endpoint re-keys a bounded batch per call, so this loops until nothing remains.
+// mutateAsync's result is the total moved, which the caller reports back to the user.
+export function useRekeyEntryDays() {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      let total = 0;
+      let remaining: number;
+      do {
+        const response = await apiClient<Schemas.RekeyEntryDaysApiResponse>(
+          "/trackers/rekey-days",
+          getToken,
+          { method: "POST" },
+        );
+        total += response.rekeyedCount ?? 0;
+        remaining = response.remainingCount ?? 0;
+      } while (remaining > 0);
+      return total;
+    },
+    onSuccess: async (total) => {
+      toast.success(
+        total === 0
+          ? "Your entries already match your timezone."
+          : `Realigned ${total} ${total === 1 ? "entry" : "entries"} to your timezone.`,
+      );
+      await queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] !== UsersQueries.keys.me()[0],
+      });
+    },
+    onError: () => {
+      toast.error("Failed to realign your entries. Please try again.");
     },
   });
 }

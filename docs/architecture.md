@@ -55,16 +55,11 @@ loses information that cannot be reconstructed.
 4. **`local_date` is computed at write time from the user's timezone, and `tz` is
    stored alongside it.** Without the stored timezone you cannot recompute dates after
    the user travels.
-   **Current limitation:** every `entries.tz`/`daily_facts.local_date` row is written
-   as `"UTC"` today (`TrackersRepo.APP_TZ`), regardless of `users.tz`. `users.tz`
-   decides only _when_ a reminder fires (`DateTime.localHourIn`/`localDateIn`), never
-   which day a row is written under (`DateTime.utcDateString`) — two differently-named
-   functions so the two questions can't be conflated. For a UTC-negative zone this
-   puts the day boundary mid-afternoon local time; it's self-consistent (anything
-   logged at that moment lands on the same UTC day) but the boundary sits somewhere
-   odd. The real fix — `local_date` computed in the entry's true zone, plus a
-   `daily_facts` backfill — is its own project; nothing in the notification path
-   depends on it landing first, since notifications only ever call `utcDateString`.
+   `users.tz` decides which calendar day a row belongs to: `TrackersRepo` resolves today with
+   `DateTime.localDateIn(users.tz)`, writes `entries.tz` as that zone, and the web app derives
+   "today" from the same `users.tz` (`utils/timeZone.ts`). Entries written before this landed
+   were keyed by UTC day; `POST /trackers/rekey-days` (Settings → "Realign past entries")
+   moves the write-time-keyed ones and rebuilds their `daily_facts`.
 5. **Components never reference a colour primitive.** Only semantic tokens and the
    categorical `--chart-N` scale. Lint-enforced.
 6. **Aggregation over entities always filters by exactly one `role`.** Grouping across

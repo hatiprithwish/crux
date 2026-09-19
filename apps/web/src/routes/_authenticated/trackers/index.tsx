@@ -22,8 +22,8 @@ export const Route = createFileRoute("/_authenticated/trackers/")({
   component: TrackersPage,
 });
 
-// DEV_NOTE: UTC throughout, matching -utils.ts's getTodayLocalDate/dayOfWeek — the app has no
-// per-user timezone yet, so parsing localDate in the viewer's own zone could roll it to the
+// DEV_NOTE: localDate is a plain calendar date already resolved in the owner's timezone, so it is
+// parsed and formatted as UTC here — parsing it in the viewer's own zone could roll it to the
 // adjacent day.
 function formatTodayLabel(localDate: string): string {
   const date = new Date(`${localDate}T00:00:00.000Z`);
